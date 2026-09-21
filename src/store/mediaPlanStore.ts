@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { supabase } from '../lib/supabase';
+import { formatSupabaseNetworkError, supabase, supabaseConfigError } from '../lib/supabase';
 
 export interface MediaRow {
   id: string;
@@ -42,16 +42,25 @@ export const useMediaPlanStore = create<MediaPlanState>((set) => ({
 
   fetchRows: async () => {
     set({ loading: true, error: null });
-    const { data, error } = await supabase
-      .from('media_plan_rows')
-      .select('*')
-      .order('sort_order');
-
-    if (error) {
-      set({ loading: false, error: error.message });
+    if (supabaseConfigError) {
+      set({ loading: false, error: supabaseConfigError });
       return;
     }
-    set({ rows: (data || []).map(rowFromDb), loading: false });
+
+    try {
+      const { data, error } = await supabase
+        .from('media_plan_rows')
+        .select('*')
+        .order('sort_order');
+
+      if (error) {
+        set({ loading: false, error: error.message });
+        return;
+      }
+      set({ rows: (data || []).map(rowFromDb), loading: false });
+    } catch (error) {
+      set({ loading: false, error: formatSupabaseNetworkError(error) });
+    }
   },
 
   addRow: async (row) => {

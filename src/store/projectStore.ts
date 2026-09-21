@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { supabase } from '../lib/supabase';
+import { formatSupabaseNetworkError, supabase, supabaseConfigError } from '../lib/supabase';
 import type { ProjectTask, Executor } from '../types/project';
 
 interface ProjectState {
@@ -71,27 +71,37 @@ export const useProjectStore = create<ProjectState>((set) => ({
     console.log('[Store] Загрузка данных из Supabase...');
     set({ loading: true, error: null });
 
-    const [tasksRes, execRes] = await Promise.all([
-      supabase.from('tasks').select('*').order('execution_order'),
-      supabase.from('executors').select('*'),
-    ]);
-
-    if (tasksRes.error) {
-      console.error('[Store] Ошибка загрузки задач:', tasksRes.error);
-      set({ loading: false, error: tasksRes.error.message });
-      return;
-    }
-    if (execRes.error) {
-      console.error('[Store] Ошибка загрузки исполнителей:', execRes.error);
-      set({ loading: false, error: execRes.error.message });
+    if (supabaseConfigError) {
+      set({ loading: false, error: supabaseConfigError });
       return;
     }
 
-    const tasks = (tasksRes.data || []).map(taskFromDb);
-    const executors = (execRes.data || []) as Executor[];
+    try {
+      const [tasksRes, execRes] = await Promise.all([
+        supabase.from('tasks').select('*').order('execution_order'),
+        supabase.from('executors').select('*'),
+      ]);
 
-    console.log(`[Store] Загружено задач: ${tasks.length}, исполнителей: ${executors.length}`);
-    set({ tasks, executors, loading: false });
+      if (tasksRes.error) {
+        console.error('[Store] Ошибка загрузки задач:', tasksRes.error);
+        set({ loading: false, error: tasksRes.error.message });
+        return;
+      }
+      if (execRes.error) {
+        console.error('[Store] Ошибка загрузки исполнителей:', execRes.error);
+        set({ loading: false, error: execRes.error.message });
+        return;
+      }
+
+      const tasks = (tasksRes.data || []).map(taskFromDb);
+      const executors = (execRes.data || []) as Executor[];
+
+      console.log(`[Store] Загружено задач: ${tasks.length}, исполнителей: ${executors.length}`);
+      set({ tasks, executors, loading: false });
+    } catch (error) {
+      console.error('[Store] Ошибка подключения к Supabase:', error);
+      set({ loading: false, error: formatSupabaseNetworkError(error) });
+    }
   },
 
   addTask: async (task) => {
