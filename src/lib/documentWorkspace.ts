@@ -26,6 +26,8 @@ export type StoredDocument = {
   createdAt: string;
   updatedAt: string;
   uploads: UploadedDocument[];
+  description?: string;
+  assignee?: string;
 };
 
 const getStorageKey = (taskId: string) => `fc-bas-document:${taskId}`;
@@ -63,6 +65,8 @@ export function readDocument(taskId: string, fallbackTitle: string): StoredDocum
       createdAt: parsed.createdAt ?? new Date().toISOString(),
       updatedAt: parsed.updatedAt ?? new Date().toISOString(),
       uploads: parsed.uploads ?? [],
+      description: parsed.description,
+      assignee: parsed.assignee,
     };
   } catch {
     return emptyDocument(taskId, fallbackTitle);
@@ -127,6 +131,8 @@ export async function persistDocument(taskId: string, record: StoredDocument): P
     title: record.title,
     content: record.content,
     uploads: record.uploads,
+    description: record.description ?? null,
+    assignee: record.assignee ?? null,
     created_at: record.createdAt,
     updated_at: record.updatedAt,
   };
@@ -206,6 +212,8 @@ export async function loadRemoteDocument(taskId: string, fallbackTitle: string):
       createdAt: data.created_at ?? new Date().toISOString(),
       updatedAt: data.updated_at ?? new Date().toISOString(),
       uploads: Array.isArray(data.uploads) ? data.uploads : [],
+      description: data.description ?? undefined,
+      assignee: data.assignee ?? undefined,
     };
   } catch {
     return readDocument(taskId, fallbackTitle);

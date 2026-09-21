@@ -10,6 +10,9 @@ create table if not exists documents (
   updated_at timestamptz not null default now()
 );
 
+alter table documents add column if not exists description text;
+alter table documents add column if not exists assignee text;
+
 create table if not exists document_activity (
   id uuid primary key default gen_random_uuid(),
   task_id text not null,

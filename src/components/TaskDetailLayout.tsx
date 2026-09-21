@@ -52,6 +52,8 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
   const [uploads, setUploads] = useState<UploadedDocument[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const autosaveTimer = useRef<number | null>(null);
+  const notesDirtyRef = useRef(false);
+  const descriptionDirtyRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -64,6 +66,10 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
       setActivity(items);
       setUploads(doc.uploads);
       setNotesText(doc.content || config.notesDefault || config.description);
+      setDescriptionText(doc.description ?? config.description);
+      setSelectedAssignee(doc.assignee ?? config.assignee);
+      notesDirtyRef.current = false;
+      descriptionDirtyRef.current = false;
     };
 
     void hydrate();
@@ -73,7 +79,15 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
       const items = await loadRemoteActivity(taskPrefix);
       setActivity(items);
       setUploads(doc.uploads);
-      setNotesText(doc.content || config.notesDefault || config.description);
+      if (!notesDirtyRef.current && doc.content !== notesText) {
+        setNotesText(doc.content || config.notesDefault || config.description);
+      }
+      if (!descriptionDirtyRef.current && doc.description !== descriptionText) {
+        setDescriptionText(doc.description ?? config.description);
+      }
+      if (!descriptionDirtyRef.current && doc.assignee !== selectedAssignee) {
+        setSelectedAssignee(doc.assignee ?? config.assignee);
+      }
     });
 
     return () => {
@@ -96,12 +110,16 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
         title: config.title,
         taskId: taskPrefix,
         content: notesText,
+        description: descriptionText,
+        assignee: selectedAssignee,
         updatedAt: new Date().toISOString(),
         uploads,
       };
       writeDocument(taskPrefix, next);
       await persistDocument(taskPrefix, next);
-      await persistActivity(taskPrefix, 'autosave', 'Текст документа сохранён автоматически');
+      notesDirtyRef.current = false;
+      descriptionDirtyRef.current = false;
+      await persistActivity(taskPrefix, 'autosave', 'Документ сохранён автоматически');
       const items = await loadRemoteActivity(taskPrefix);
       setActivity(items);
     }, 600);
@@ -111,7 +129,7 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
         window.clearTimeout(autosaveTimer.current);
       }
     };
-  }, [config.mode, config.title, notesText, taskPrefix, uploads]);
+  }, [config.assignee, config.description, config.mode, config.title, descriptionText, notesText, selectedAssignee, taskPrefix, uploads]);
 
   const handleReviewChange = useCallback((key: string, data: ReviewData) => {
     setReviewMap(prev => {
@@ -134,6 +152,8 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
       title: config.title,
       taskId: taskPrefix,
       content: notesText,
+      description: descriptionText,
+      assignee: selectedAssignee,
       updatedAt: new Date().toISOString(),
       uploads,
     };
@@ -279,7 +299,10 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
               <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Ответственный</p>
               <select
                 value={selectedAssignee}
-                onChange={(e) => setSelectedAssignee(e.target.value)}
+                onChange={(e) => {
+                  descriptionDirtyRef.current = true;
+                  setSelectedAssignee(e.target.value);
+                }}
                 className="flex items-center gap-2 text-sm font-medium text-slate-900 bg-transparent border border-slate-200 rounded px-2 py-1 hover:border-blue-400 transition-colors cursor-pointer outline-none focus:border-blue-500"
               >
                 {ASSIGNEES.map((a) => (
@@ -290,7 +313,10 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
             <h3 className="font-semibold text-slate-900 mb-2 shrink-0">Описание задачи</h3>
             <textarea
               value={descriptionText}
-              onChange={(e) => setDescriptionText(e.target.value)}
+              onChange={(e) => {
+                descriptionDirtyRef.current = true;
+                setDescriptionText(e.target.value);
+              }}
               className="flex-1 text-sm text-slate-600 leading-relaxed w-full resize-none outline-none bg-transparent"
               placeholder="Введите описание задачи..."
             />
@@ -393,7 +419,10 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
 
             <textarea
               value={notesText}
-              onChange={(e) => setNotesText(e.target.value)}
+              onChange={(e) => {
+                notesDirtyRef.current = true;
+                setNotesText(e.target.value);
+              }}
               placeholder={config.notesPlaceholder ?? 'Введите текст документа...'}
               className="w-full flex-1 min-h-[420px] resize-none rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 leading-6 outline-none transition focus:border-blue-400 focus:bg-white"
             />
