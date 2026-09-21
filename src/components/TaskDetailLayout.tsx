@@ -54,6 +54,12 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
   const autosaveTimer = useRef<number | null>(null);
   const notesDirtyRef = useRef(false);
   const descriptionDirtyRef = useRef(false);
+  const tableSaveRef = useRef<(() => Promise<boolean>) | null>(null);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
+  const registerTableSave = useCallback((save: () => Promise<boolean>) => {
+    tableSaveRef.current = save;
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -146,21 +152,33 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
   };
 
   const handleManualSave = async () => {
-    const current = readDocument(taskPrefix, config.title);
-    const next = {
-      ...current,
-      title: config.title,
-      taskId: taskPrefix,
-      content: notesText,
-      description: descriptionText,
-      assignee: selectedAssignee,
-      updatedAt: new Date().toISOString(),
-      uploads,
-    };
-    writeDocument(taskPrefix, next);
-    await persistDocument(taskPrefix, next);
-    await persistActivity(taskPrefix, 'save', 'Документ сохранён вручную');
-    setActivity(await loadRemoteActivity(taskPrefix));
+    setSaveState('saving');
+    try {
+      let saved = false;
+      if (config.mode === 'table' && tableSaveRef.current) {
+        saved = await tableSaveRef.current();
+      } else {
+        const current = readDocument(taskPrefix, config.title);
+        const next = {
+          ...current,
+          title: config.title,
+          taskId: taskPrefix,
+          content: notesText,
+          description: descriptionText,
+          assignee: selectedAssignee,
+          updatedAt: new Date().toISOString(),
+          uploads,
+        };
+        writeDocument(taskPrefix, next);
+        saved = await persistDocument(taskPrefix, next);
+        await persistActivity(taskPrefix, 'save', 'Документ сохранён вручную');
+        setActivity(await loadRemoteActivity(taskPrefix));
+      }
+      setSaveState(saved ? 'saved' : 'error');
+      window.setTimeout(() => setSaveState('idle'), 1800);
+    } catch {
+      setSaveState('error');
+    }
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -285,9 +303,12 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
         </div>
         <button
           onClick={handleManualSave}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 shadow-sm shrink-0"
+          disabled={saveState === 'saving'}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white shadow-sm shrink-0 transition-colors ${
+            saveState === 'saved' ? 'bg-emerald-600' : saveState === 'error' ? 'bg-red-600' : saveState === 'saving' ? 'bg-blue-400 cursor-wait' : 'bg-blue-600 hover:bg-blue-700'
+          }`}
         >
-          <Save size={16} />Сохранить
+          <Save size={16} />{saveState === 'saving' ? 'Сохранение...' : saveState === 'saved' ? 'Сохранено' : saveState === 'error' ? 'Ошибка сохранения' : 'Сохранить'}
         </button>
       </div>
 
@@ -455,6 +476,7 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
             reviewMap={reviewMap}
             onReviewChange={handleReviewChange}
             kpiTarget={config.kpiTarget}
+            onSaveReady={registerTableSave}
           />
         )}
       </div>

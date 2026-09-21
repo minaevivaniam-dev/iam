@@ -111,7 +111,15 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
 
 // Роутер внутри раздела «Задачи»
 function TasksRouter() {
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(() => localStorage.getItem('selectedTaskId'));
+
+  useEffect(() => {
+    if (selectedTaskId) {
+      localStorage.setItem('selectedTaskId', selectedTaskId);
+    } else {
+      localStorage.removeItem('selectedTaskId');
+    }
+  }, [selectedTaskId]);
 
   if (selectedTaskId === 'content-plan') {
     return <ContentPlan onBack={() => setSelectedTaskId(null)} />;

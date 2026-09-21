@@ -12,6 +12,13 @@ import {
   Send, MessageCircle, LayoutGrid, ChevronLeft, RotateCcw, X, Bold, Italic, List,
   MessageSquare, ThumbsUp, ThumbsDown
 } from 'lucide-react';
+import {
+  loadRemoteDocument,
+  persistActivity,
+  persistDocument,
+  readDocument,
+  writeDocument,
+} from '../lib/documentWorkspace';
 
 type Status = 'запланирован' | 'в работе' | 'на согласовании' | 'опубликован' | 'отменен';
 
@@ -373,7 +380,7 @@ function ReviewableRow({
 }
 
 export function ReviewableTable({
-  taskPrefix, columns, initialRows, reviewMode, reviewMap, onReviewChange, kpiTarget
+  taskPrefix, columns, initialRows, reviewMode, reviewMap, onReviewChange, kpiTarget, onSaveReady
 }: {
   taskPrefix: string;
   columns: ColumnConfig[];
@@ -382,6 +389,7 @@ export function ReviewableTable({
   reviewMap: Map<string, ReviewData>;
   onReviewChange: (key: string, data: ReviewData) => void;
   kpiTarget?: number;
+  onSaveReady?: (save: () => Promise<boolean>) => void;
 }) {
   const [rows, setRows] = useState<TaskRow[]>(initialRows);
   const [hiddenCols, setHiddenCols] = useState<Set<string>>(new Set());
@@ -397,6 +405,56 @@ export function ReviewableTable({
   const startX = useRef(0);
   const startWidth = useRef(0);
   const editorRef = useRef<HTMLDivElement>(null);
+  const rowsRef = useRef(rows);
+  const hydratedRef = useRef(false);
+  const saveTimer = useRef<number | null>(null);
+
+  rowsRef.current = rows;
+
+  const saveRows = useCallback(async () => {
+    const current = readDocument(taskPrefix, taskPrefix);
+    const next = {
+      ...current,
+      taskId: taskPrefix,
+      content: JSON.stringify({ rows: rowsRef.current }),
+      updatedAt: new Date().toISOString(),
+    };
+    writeDocument(taskPrefix, next);
+    const saved = await persistDocument(taskPrefix, next);
+    await persistActivity(taskPrefix, 'table-save', 'Таблица сохранена');
+    return saved;
+  }, [taskPrefix]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const hydrateRows = async () => {
+      const document = await loadRemoteDocument(taskPrefix, taskPrefix);
+      if (!isMounted) return;
+
+      try {
+        const parsed = JSON.parse(document.content) as { rows?: TaskRow[] };
+        if (Array.isArray(parsed.rows)) setRows(parsed.rows);
+      } catch {
+        // Existing non-table documents keep their initial rows.
+      }
+      hydratedRef.current = true;
+    };
+    void hydrateRows();
+    return () => { isMounted = false; };
+  }, [taskPrefix]);
+
+  useEffect(() => {
+    onSaveReady?.(saveRows);
+  }, [onSaveReady, saveRows]);
+
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => { void saveRows(); }, 700);
+    return () => {
+      if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    };
+  }, [rows, saveRows]);
 
   const kpiField = columns.find(c => c.isKpiField);
   const kpiCount = kpiField ? rows.filter(r => r[kpiField.key] && String(r[kpiField.key]).trim().length > 0).length : 0;
