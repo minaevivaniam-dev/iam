@@ -1,0 +1,306 @@
+import { supabase } from './supabase';
+
+export type UploadedDocument = {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  createdAt: string;
+  dataUrl?: string;
+  storagePath?: string;
+  url?: string;
+};
+
+export type ActivityEntry = {
+  id: string;
+  action: string;
+  detail: string;
+  createdAt: string;
+};
+
+export type StoredDocument = {
+  id: string;
+  taskId: string;
+  title: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  uploads: UploadedDocument[];
+};
+
+const getStorageKey = (taskId: string) => `fc-bas-document:${taskId}`;
+const getActivityKey = (taskId: string) => `fc-bas-activity:${taskId}`;
+
+const emptyDocument = (taskId: string, title: string): StoredDocument => ({
+  id: taskId,
+  taskId,
+  title,
+  content: '',
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  uploads: [],
+});
+
+const isSupabaseTableMissing = (error: { message?: string } | null | undefined) => {
+  if (!error) return false;
+  const message = error.message ?? '';
+  return message.toLowerCase().includes('does not exist') || message.toLowerCase().includes('relation') || message.toLowerCase().includes('not found');
+};
+
+export function readDocument(taskId: string, fallbackTitle: string): StoredDocument {
+  if (typeof window === 'undefined') return emptyDocument(taskId, fallbackTitle);
+
+  try {
+    const raw = window.localStorage.getItem(getStorageKey(taskId));
+    if (!raw) return emptyDocument(taskId, fallbackTitle);
+
+    const parsed = JSON.parse(raw) as Partial<StoredDocument>;
+    return {
+      id: parsed.id ?? taskId,
+      taskId: parsed.taskId ?? taskId,
+      title: parsed.title ?? fallbackTitle,
+      content: parsed.content ?? '',
+      createdAt: parsed.createdAt ?? new Date().toISOString(),
+      updatedAt: parsed.updatedAt ?? new Date().toISOString(),
+      uploads: parsed.uploads ?? [],
+    };
+  } catch {
+    return emptyDocument(taskId, fallbackTitle);
+  }
+}
+
+export function writeDocument(taskId: string, record: StoredDocument) {
+  if (typeof window === 'undefined') return;
+
+  const next = {
+    ...record,
+    id: taskId,
+    taskId,
+    updatedAt: new Date().toISOString(),
+  };
+
+  window.localStorage.setItem(getStorageKey(taskId), JSON.stringify(next));
+  if (typeof BroadcastChannel !== 'undefined') {
+    const channel = new BroadcastChannel('fc-bas-documents');
+    channel.postMessage({ taskId, type: 'document-update' });
+    channel.close();
+  }
+}
+
+export function readActivity(taskId: string): ActivityEntry[] {
+  if (typeof window === 'undefined') return [];
+
+  try {
+    const raw = window.localStorage.getItem(getActivityKey(taskId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as ActivityEntry[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function appendActivity(taskId: string, action: string, detail: string) {
+  if (typeof window === 'undefined') return;
+
+  const next: ActivityEntry = {
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    action,
+    detail,
+    createdAt: new Date().toISOString(),
+  };
+
+  const items = [...readActivity(taskId), next].slice(-25);
+  window.localStorage.setItem(getActivityKey(taskId), JSON.stringify(items));
+
+  if (typeof BroadcastChannel !== 'undefined') {
+    const channel = new BroadcastChannel('fc-bas-documents');
+    channel.postMessage({ taskId, type: 'activity-update' });
+    channel.close();
+  }
+}
+
+export async function persistDocument(taskId: string, record: StoredDocument): Promise<boolean> {
+  const remoteRow = {
+    id: taskId,
+    task_id: taskId,
+    title: record.title,
+    content: record.content,
+    uploads: record.uploads,
+    created_at: record.createdAt,
+    updated_at: record.updatedAt,
+  };
+
+  try {
+    const { error } = await supabase.from('documents').upsert(remoteRow, { onConflict: 'id' });
+    if (error && isSupabaseTableMissing(error)) {
+      writeDocument(taskId, record);
+      return false;
+    }
+    if (error) {
+      writeDocument(taskId, record);
+      return false;
+    }
+    writeDocument(taskId, record);
+    return true;
+  } catch {
+    writeDocument(taskId, record);
+    return false;
+  }
+}
+
+export async function persistActivity(taskId: string, action: string, detail: string): Promise<boolean> {
+  const entry: ActivityEntry = {
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    action,
+    detail,
+    createdAt: new Date().toISOString(),
+  };
+
+  try {
+    const { error } = await supabase.from('document_activity').insert({
+      id: entry.id,
+      task_id: taskId,
+      action: entry.action,
+      detail: entry.detail,
+      created_at: entry.createdAt,
+    });
+
+    if (error && isSupabaseTableMissing(error)) {
+      appendActivity(taskId, action, detail);
+      return false;
+    }
+    if (error) {
+      appendActivity(taskId, action, detail);
+      return false;
+    }
+
+    appendActivity(taskId, action, detail);
+    return true;
+  } catch {
+    appendActivity(taskId, action, detail);
+    return false;
+  }
+}
+
+export async function loadRemoteDocument(taskId: string, fallbackTitle: string): Promise<StoredDocument> {
+  try {
+    const { data, error } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('id', taskId)
+      .maybeSingle();
+
+    if (error && isSupabaseTableMissing(error)) {
+      return readDocument(taskId, fallbackTitle);
+    }
+    if (error || !data) {
+      return readDocument(taskId, fallbackTitle);
+    }
+
+    return {
+      id: data.id,
+      taskId: data.task_id ?? taskId,
+      title: data.title ?? fallbackTitle,
+      content: data.content ?? '',
+      createdAt: data.created_at ?? new Date().toISOString(),
+      updatedAt: data.updated_at ?? new Date().toISOString(),
+      uploads: Array.isArray(data.uploads) ? data.uploads : [],
+    };
+  } catch {
+    return readDocument(taskId, fallbackTitle);
+  }
+}
+
+export async function loadRemoteActivity(taskId: string): Promise<ActivityEntry[]> {
+  try {
+    const { data, error } = await supabase
+      .from('document_activity')
+      .select('*')
+      .eq('task_id', taskId)
+      .order('created_at', { ascending: false })
+      .limit(25);
+
+    if (error && isSupabaseTableMissing(error)) {
+      return readActivity(taskId);
+    }
+    if (error || !data) {
+      return readActivity(taskId);
+    }
+
+    return (data || []).map((item: any) => ({
+      id: item.id,
+      action: item.action,
+      detail: item.detail,
+      createdAt: item.created_at,
+    }));
+  } catch {
+    return readActivity(taskId);
+  }
+}
+
+export function subscribeToTask(taskId: string, onChange: () => void) {
+  if (typeof window === 'undefined') return () => {};
+
+  const localUnsub = (() => {
+    const onStorage = (event: StorageEvent) => {
+      if (!event.key) return;
+      if (event.key === getStorageKey(taskId) || event.key === getActivityKey(taskId)) onChange();
+    };
+
+    const channel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('fc-bas-documents') : null;
+    if (channel) {
+      channel.addEventListener('message', (event) => {
+        if (event.data?.taskId === taskId) onChange();
+      });
+    }
+
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      channel?.close();
+    };
+  })();
+
+  try {
+    const channel = supabase.channel(`docs:${taskId}`);
+    channel
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'documents', filter: `id=eq.${taskId}` },
+        () => onChange()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'document_activity', filter: `task_id=eq.${taskId}` },
+        () => onChange()
+      )
+      .subscribe();
+
+    return () => {
+      localUnsub();
+      void supabase.removeChannel(channel);
+    };
+  } catch {
+    return localUnsub;
+  }
+}
+
+export function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ''));
+    reader.onerror = () => reject(new Error('Не удалось прочитать файл'));
+    reader.readAsDataURL(file);
+  });
+}
+
+export function downloadTextFile(filename: string, content: string) {
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}

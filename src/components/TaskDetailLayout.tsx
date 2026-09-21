@@ -1,9 +1,23 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   ArrowLeft, Save, FileText,
-  Edit3, Eye
+  Edit3, Eye, Upload, Download, Clock3
 } from 'lucide-react';
 import { ReviewableTable, type ReviewData, type ColumnConfig, type TaskRow } from './ReviewableTable';
+import {
+  downloadTextFile,
+  fileToDataUrl,
+  loadRemoteActivity,
+  loadRemoteDocument,
+  persistActivity,
+  persistDocument,
+  readDocument,
+  subscribeToTask,
+  type ActivityEntry,
+  type UploadedDocument,
+  writeDocument,
+} from '../lib/documentWorkspace';
+import { supabase } from '../lib/supabase';
 
 export interface TaskConfig {
   title: string;
@@ -34,6 +48,70 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
   const [descriptionText, setDescriptionText] = useState(config.description);
   const [notesText, setNotesText] = useState(config.notesDefault ?? config.description);
   const [selectedAssignee, setSelectedAssignee] = useState(config.assignee);
+  const [activity, setActivity] = useState<ActivityEntry[]>([]);
+  const [uploads, setUploads] = useState<UploadedDocument[]>([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const autosaveTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const hydrate = async () => {
+      const doc = await loadRemoteDocument(taskPrefix, config.title);
+      const items = await loadRemoteActivity(taskPrefix);
+
+      if (!isMounted) return;
+      setActivity(items);
+      setUploads(doc.uploads);
+      setNotesText(doc.content || config.notesDefault || config.description);
+    };
+
+    void hydrate();
+
+    const unsubscribe = subscribeToTask(taskPrefix, async () => {
+      const doc = await loadRemoteDocument(taskPrefix, config.title);
+      const items = await loadRemoteActivity(taskPrefix);
+      setActivity(items);
+      setUploads(doc.uploads);
+      setNotesText(doc.content || config.notesDefault || config.description);
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [config.description, config.notesDefault, config.title, taskPrefix]);
+
+  useEffect(() => {
+    if (config.mode !== 'notes') return;
+
+    if (autosaveTimer.current) {
+      window.clearTimeout(autosaveTimer.current);
+    }
+
+    autosaveTimer.current = window.setTimeout(async () => {
+      const current = readDocument(taskPrefix, config.title);
+      const next = {
+        ...current,
+        title: config.title,
+        taskId: taskPrefix,
+        content: notesText,
+        updatedAt: new Date().toISOString(),
+        uploads,
+      };
+      writeDocument(taskPrefix, next);
+      await persistDocument(taskPrefix, next);
+      await persistActivity(taskPrefix, 'autosave', 'Текст документа сохранён автоматически');
+      const items = await loadRemoteActivity(taskPrefix);
+      setActivity(items);
+    }, 600);
+
+    return () => {
+      if (autosaveTimer.current) {
+        window.clearTimeout(autosaveTimer.current);
+      }
+    };
+  }, [config.mode, config.title, notesText, taskPrefix, uploads]);
 
   const handleReviewChange = useCallback((key: string, data: ReviewData) => {
     setReviewMap(prev => {
@@ -47,6 +125,102 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
     approved: Array.from(reviewMap.values()).filter(r => r.status === 'approved').length,
     rejected: Array.from(reviewMap.values()).filter(r => r.status === 'rejected').length,
     commented: Array.from(reviewMap.values()).filter(r => r.comments.length > 0).length,
+  };
+
+  const handleManualSave = async () => {
+    const current = readDocument(taskPrefix, config.title);
+    const next = {
+      ...current,
+      title: config.title,
+      taskId: taskPrefix,
+      content: notesText,
+      updatedAt: new Date().toISOString(),
+      uploads,
+    };
+    writeDocument(taskPrefix, next);
+    await persistDocument(taskPrefix, next);
+    await persistActivity(taskPrefix, 'save', 'Документ сохранён вручную');
+    setActivity(await loadRemoteActivity(taskPrefix));
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const timestamp = Date.now();
+    const storagePath = `${taskPrefix}/${timestamp}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+
+    let uploadedDoc: UploadedDocument = {
+      id: `${timestamp}-${Math.random().toString(16).slice(2)}`,
+      name: file.name,
+      type: file.type || 'application/octet-stream',
+      size: file.size,
+      createdAt: new Date().toISOString(),
+      storagePath,
+      url: '',
+    };
+
+    try {
+      const { error } = await supabase.storage.from('documents').upload(storagePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type || 'application/octet-stream',
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      const { data } = supabase.storage.from('documents').getPublicUrl(storagePath);
+      uploadedDoc = {
+        ...uploadedDoc,
+        url: data?.publicUrl || '',
+      };
+    } catch {
+      const dataUrl = await fileToDataUrl(file);
+      uploadedDoc = {
+        ...uploadedDoc,
+        dataUrl,
+      };
+    }
+
+    const current = readDocument(taskPrefix, config.title);
+    const next = {
+      ...current,
+      title: config.title,
+      taskId: taskPrefix,
+      content: notesText,
+      uploads: [...current.uploads, uploadedDoc],
+      updatedAt: new Date().toISOString(),
+    };
+    writeDocument(taskPrefix, next);
+    setUploads(next.uploads);
+    await persistDocument(taskPrefix, next);
+    await persistActivity(taskPrefix, 'upload', `Загружен файл: ${file.name}. Ссылка сохранена в документе.`);
+    setActivity(await loadRemoteActivity(taskPrefix));
+    event.target.value = '';
+  };
+
+  const handleDownload = (doc: UploadedDocument) => {
+    const url = doc.url || doc.dataUrl;
+
+    if (!url) return;
+
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    if (url.startsWith('data:text/plain')) {
+      const [, raw] = (doc.dataUrl ?? '').split(',');
+      downloadTextFile(doc.name, decodeURIComponent(raw || ''));
+      return;
+    }
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = doc.name;
+    link.click();
   };
 
   return (
@@ -89,7 +263,10 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
             )}
           </div>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 shadow-sm shrink-0">
+        <button
+          onClick={handleManualSave}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 shadow-sm shrink-0"
+        >
           <Save size={16} />Сохранить
         </button>
       </div>
@@ -181,17 +358,64 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
       {/* === ТАБЛИЦА / ТЕКСТОВЫЙ РЕДАКТОР === */}
       <div className="flex-1 min-h-0">
         {config.mode === 'notes' ? (
-          <div className="h-full rounded-2xl border border-slate-200 bg-white shadow-sm p-4 flex flex-col">
-            <div className="flex items-center justify-between mb-3">
+          <div className="h-full rounded-2xl border border-slate-200 bg-white shadow-sm p-4 flex flex-col gap-4">
+            <div className="flex items-center justify-between mb-1">
               <h2 className="text-lg font-semibold text-slate-900">Текст документа</h2>
               <span className="text-xs text-slate-500 px-2 py-1 rounded-full bg-slate-100 border border-slate-200">Черновик</span>
             </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-700 hover:border-blue-400 hover:text-blue-600"
+              >
+                <Upload size={15} /> Загрузить документ
+              </button>
+              <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} />
+              <span className="text-xs text-slate-500">Автосохранение включено</span>
+            </div>
+
+            {uploads.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {uploads.map((doc) => (
+                  <button
+                    key={doc.id}
+                    type="button"
+                    onClick={() => handleDownload(doc)}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-xs text-slate-700 hover:bg-slate-200"
+                  >
+                    <Download size={12} /> {doc.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <textarea
               value={notesText}
               onChange={(e) => setNotesText(e.target.value)}
               placeholder={config.notesPlaceholder ?? 'Введите текст документа...'}
               className="w-full flex-1 min-h-[420px] resize-none rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 leading-6 outline-none transition focus:border-blue-400 focus:bg-white"
             />
+
+            <div className="border border-slate-200 rounded-xl bg-slate-50 p-3">
+              <div className="flex items-center gap-2 mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <Clock3 size={12} /> Лог действий
+              </div>
+              <div className="space-y-2 max-h-28 overflow-y-auto">
+                {activity.length === 0 ? (
+                  <p className="text-xs text-slate-400">Пока нет записей в логе.</p>
+                ) : (
+                  activity.map((item) => (
+                    <div key={item.id} className="flex items-start gap-2 text-xs text-slate-600">
+                      <span className="inline-flex items-center rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 font-medium">{item.action}</span>
+                      <span className="flex-1">{item.detail}</span>
+                      <span className="text-[10px] text-slate-400">{new Date(item.createdAt).toLocaleString('ru-RU')}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
         ) : (
           <ReviewableTable
