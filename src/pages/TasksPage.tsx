@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { FolderOpen, ChevronDown, FileText, PenTool, Paperclip, Lightbulb, FileEdit } from 'lucide-react';
+import type { LucideProps } from 'lucide-react';
 
 interface TaskCard {
   id: string;
   title: string;
   description: string;
-  icon: React.ElementType;
-  subtasks?: { id: string; label: string; icon: React.ElementType }[];
+  icon: React.ElementType<LucideProps>;
+  subtasks?: { id: string; label: string; icon: React.ElementType<LucideProps> }[];
 }
 
 const TASKS: TaskCard[] = [

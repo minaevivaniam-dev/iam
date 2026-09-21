@@ -7,7 +7,7 @@ type SubTask = 'plan' | 'writing' | 'attachments';
 interface SubTaskConfig {
   id: SubTask;
   label: string;
-  icon: React.ElementType;
+  icon: React.ElementType<{ size?: number | string; className?: string }>;
   assignee: string;
   description: string;
   metrics: {
@@ -46,7 +46,7 @@ const SUBTASKS: SubTaskConfig[] = [
 ];
 
 function MetricCube({ label, value, icon: Icon, color }: {
-  label: string; value: number; icon: React.ElementType; color: string;
+  label: string; value: number; icon: React.ElementType<{ size?: number | string; className?: string }>; color: string;
 }) {
   return (
     <div className="flex flex-col gap-2 p-4 bg-white border border-slate-200 rounded-lg">

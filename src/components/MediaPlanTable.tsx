@@ -104,7 +104,6 @@ function SingleMediaTable({ tabPrefix }: { tabPrefix: string }) {
   const startX = useRef<number>(0);
   const startWidth = useRef<number>(0);
   const editorRef = useRef<HTMLDivElement>(null);
-  const savedSelection = useRef<Range | null>(null);
 
   useEffect(() => {
     if (!initialized.current) {

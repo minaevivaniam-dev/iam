@@ -18,7 +18,7 @@ import {
 
 type Tab = 'summary' | 'dashboard' | 'create-task' | 'graph' | 'mediaplan' | 'tasks' | 'analytics' | 'moderation' | 'ads';
 
-const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
+const TABS: { id: Tab; label: string; icon: React.ElementType<{ size?: number | string; className?: string }> }[] = [
   { id: 'summary', label: 'Сводная', icon: LayoutGrid },
   { id: 'dashboard', label: 'Панель управления', icon: ListChecks },
   { id: 'tasks', label: 'Задачи', icon: ListChecks },

@@ -137,7 +137,7 @@ function CommentBubble({
 
 function ReviewableRow({
   row, columns, colWidths, hiddenCols, reviewMode, reviewMap,
-  onUpdate, onInsert, onEditClick, onTogglePlatform, onStatusChange,
+  onUpdate, onInsert, onTogglePlatform, onStatusChange,
   onCellClick
 }: {
   row: TaskRow; columns: ColumnConfig[]; colWidths: Record<string, number>;
@@ -145,7 +145,6 @@ function ReviewableRow({
   reviewMap: Map<string, ReviewData>;
   onUpdate: (id: string, field: string, val: any) => void;
   onInsert: (id: string) => void;
-  onEditClick: (id: string, txt: string) => void;
   onTogglePlatform: (id: string, platformId: string) => void;
   onStatusChange: (id: string, status: Status) => void;
   onCellClick: (rowId: string, colKey: string, zone: 'top' | 'bottom-left' | 'bottom-right', event: React.MouseEvent) => void;
@@ -485,12 +484,7 @@ export function ReviewableTable({
     updateCell(rowId, 'platforms', current.includes(platformId) ? current.filter(p => p !== platformId) : [...current, platformId]);
   };
 
-  const openTextEdit = (id: string, colKey: string) => {
-    if (reviewMode) return;
-    const row = rows.find(r => r.id === id);
-    setEditingCell({ rowId: id, colKey });
-    setTempText(row?.[colKey] || '');
-  };
+  // Функция openTextEdit удалена как неиспользуемая
   useEffect(() => { if (editingCell && editorRef.current) editorRef.current.innerHTML = tempText; }, [editingCell]);
   const handleEditorInput = () => { if (editorRef.current) setTempText(editorRef.current.innerHTML); };
   const execFormat = (command: string) => {
@@ -587,7 +581,6 @@ export function ReviewableTable({
                     key={row.id} row={row} columns={columns} colWidths={colWidths}
                     hiddenCols={hiddenCols} reviewMode={reviewMode} reviewMap={reviewMap}
                     onUpdate={updateCell} onInsert={insertRow}
-                    onEditClick={(id, txt) => openTextEdit(id, 'text')}
                     onTogglePlatform={togglePlatform} onStatusChange={onStatusChange}
                     onCellClick={handleCellClick}
                   />

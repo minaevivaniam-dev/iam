@@ -7,7 +7,7 @@ import {
   arrayMove, SortableContext, verticalListSortingStrategy, useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Plus, GripVertical } from 'lucide-react';
+import { Plus, GripVertical, ChevronLeft, RotateCcw } from 'lucide-react';
 
 type Status = 'запланирован' | 'в работе' | 'на согласовании' | 'опубликован' | 'отменен';
 

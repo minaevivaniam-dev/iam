@@ -1,17 +1,16 @@
-import { useRef, useMemo } from 'react';
+import { useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Text, RoundedBox, Float, Environment, ContactShadows } from '@react-three/drei';
+import { OrbitControls, Text, RoundedBox, Float, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
 
 const PLAN = { time: 10, cost: 8, quality: 6 };
 const FACT = { time: 15, cost: 6.4, quality: 4.8 };
 
 function AxisLine({ start, end, color }: { start: [number, number, number]; end: [number, number, number]; color: string }) {
-  const points = useMemo(() => [new THREE.Vector3(...start), new THREE.Vector3(...end)], [start, end]);
   return (
     <line>
       <bufferGeometry attach="geometry">
-        <float32BufferAttribute attach="attributes-position" count={2} array={new Float32Array([...start, ...end])} itemSize={3} />
+        <float32BufferAttribute attach="attributes-position" args={[new Float32Array([...start, ...end]), 3]} itemSize={3} />
       </bufferGeometry>
       <lineBasicMaterial attach="material" color={color} linewidth={2} transparent opacity={0.6} />
     </line>

@@ -31,6 +31,8 @@ function taskToDb(task: ProjectTask) {
     status: task.status,
     channel: task.channel || null,
     format: task.format || null,
+    description: task.description || null,
+    assignee: task.assignee || null,
     created_at: task.createdAt,
     updated_at: task.updatedAt,
   };
@@ -49,8 +51,11 @@ function taskFromDb(row: any): ProjectTask {
     qualityTarget: row.quality_target || 100,
     dependencies: row.dependencies || [],
     status: row.status || 'planned',
+    parentId: row.parent_id || null,
     channel: row.channel || undefined,
     format: row.format || undefined,
+    description: row.description || '',
+    assignee: row.assignee || '',
     createdAt: row.created_at || new Date().toISOString(),
     updatedAt: row.updated_at || new Date().toISOString(),
   };
@@ -116,6 +121,8 @@ export const useProjectStore = create<ProjectState>((set) => ({
     if (updates.status !== undefined) dbUpdates.status = updates.status;
     if (updates.channel !== undefined) dbUpdates.channel = updates.channel;
     if (updates.format !== undefined) dbUpdates.format = updates.format;
+    if (updates.description !== undefined) dbUpdates.description = updates.description;
+    if (updates.assignee !== undefined) dbUpdates.assignee = updates.assignee;
 
     const { error } = await supabase.from('tasks').update(dbUpdates).eq('id', id);
     if (error) {

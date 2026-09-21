@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import {
-  ArrowLeft, Save, FileText, Clock, Award, DollarSign, User,
-  Edit3, Eye, ChevronLeft
+  ArrowLeft, Save, FileText,
+  Edit3, Eye
 } from 'lucide-react';
 import { ReviewableTable, type ReviewData, type ColumnConfig, type TaskRow } from './ReviewableTable';
 
@@ -15,10 +15,21 @@ export interface TaskConfig {
   kpiTarget?: number;
 }
 
+const ASSIGNEES = [
+  { id: 'copywriter', name: 'Копирайтер' },
+  { id: 'designer', name: 'Дизайнер' },
+  { id: 'manager', name: 'Менеджер' },
+  { id: 'analyst', name: 'Аналитик' },
+  { id: 'editor', name: 'Редактор' },
+  { id: 'smm', name: 'SMM-специалист' },
+];
+
 export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskConfig; taskPrefix: string; onBack: () => void }) {
   const [reviewMode, setReviewMode] = useState(false);
   const [reviewMap, setReviewMap] = useState<Map<string, ReviewData>>(new Map());
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
+  const [descriptionText, setDescriptionText] = useState(config.description);
+  const [selectedAssignee, setSelectedAssignee] = useState(config.assignee);
 
   const handleReviewChange = useCallback((key: string, data: ReviewData) => {
     setReviewMap(prev => {
@@ -85,10 +96,23 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
           <div className="bg-white border border-slate-200 rounded-lg p-4 overflow-y-auto flex flex-col w-1/2">
             <div className="mb-3">
               <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Ответственный</p>
-              <div className="flex items-center gap-2 text-sm font-medium text-slate-900"><User size={14} className="text-blue-600" />{config.assignee}</div>
+              <select
+                value={selectedAssignee}
+                onChange={(e) => setSelectedAssignee(e.target.value)}
+                className="flex items-center gap-2 text-sm font-medium text-slate-900 bg-transparent border border-slate-200 rounded px-2 py-1 hover:border-blue-400 transition-colors cursor-pointer outline-none focus:border-blue-500"
+              >
+                {ASSIGNEES.map((a) => (
+                  <option key={a.id} value={a.name}>{a.name}</option>
+                ))}
+              </select>
             </div>
             <h3 className="font-semibold text-slate-900 mb-2 shrink-0">Описание задачи</h3>
-            <p className="flex-1 text-sm text-slate-600 leading-relaxed">{config.description}</p>
+            <textarea
+              value={descriptionText}
+              onChange={(e) => setDescriptionText(e.target.value)}
+              className="flex-1 text-sm text-slate-600 leading-relaxed w-full resize-none outline-none bg-transparent"
+              placeholder="Введите описание задачи..."
+            />
           </div>
           <div className="w-2 bg-slate-300 rounded-full mx-2 shrink-0" />
           <div className="flex flex-col gap-3 w-1/2">

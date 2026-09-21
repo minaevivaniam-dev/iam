@@ -21,6 +21,26 @@ export type TaskStatus =
   | 'overdue';    // Просрочена
 
 /**
+ * Канал публикации
+ */
+export type Channel = 'МАКС' | 'Telegram' | 'ВКонтакте' | 'Дзен' | 'VC.ru';
+
+/**
+ * Формат контента
+ */
+export type ContentFormat = 
+  | 'Новостная' 
+  | 'Информационная' 
+  | 'Экспертная' 
+  | 'Карусель' 
+  | 'Инфографика' 
+  | 'Интерактив' 
+  | 'Портретная' 
+  | 'Видео' 
+  | 'Лонгрид' 
+  | 'Посев';
+
+/**
  * Задача проекта
  */
 export interface ProjectTask {
@@ -37,6 +57,12 @@ export interface ProjectTask {
   
   // Связи
   dependencies: string[];     // ID задач, от которых зависит эта задача
+  
+  // Дополнительные поля
+  channel?: Channel;          // Канал публикации
+  format?: ContentFormat;     // Формат контента
+  description?: string;       // Описание задачи
+  assignee?: string;          // Ответственный
   
   // Системные поля
   status: TaskStatus;

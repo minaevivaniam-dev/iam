@@ -7,6 +7,8 @@ export function CreateTaskPage() {
 
   const [title, setTitle] = useState('');
   const [technicalSpec, setTechnicalSpec] = useState('');
+  const [description, setDescription] = useState('');
+  const [assignee, setAssignee] = useState('');
   const [selectedExecutors, setSelectedExecutors] = useState<string[]>([]);
   const [executionOrder, setExecutionOrder] = useState<number>(1);
   const [deadline, setDeadline] = useState('');
@@ -32,6 +34,8 @@ export function CreateTaskPage() {
       id: `task-${Date.now()}`,
       title,
       technicalSpec,
+      description,
+      assignee,
       executorIds: selectedExecutors,
       executionOrder,
       deadline,
@@ -39,6 +43,7 @@ export function CreateTaskPage() {
       qualityTarget,
       dependencies: dependencies ? dependencies.split(',').map(d => d.trim()) : [],
       status,
+      parentId: null,
       channel: channel || undefined,
       format: format || undefined,
       createdAt: new Date().toISOString(),
@@ -50,6 +55,8 @@ export function CreateTaskPage() {
     // Сброс формы
     setTitle('');
     setTechnicalSpec('');
+    setDescription('');
+    setAssignee('');
     setSelectedExecutors([]);
     setExecutionOrder(1);
     setDeadline('');
@@ -83,6 +90,27 @@ export function CreateTaskPage() {
             value={technicalSpec} 
             onChange={(e) => setTechnicalSpec(e.target.value)}
             rows={4}
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Описание задачи</label>
+          <textarea 
+            value={description} 
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Ответственный</label>
+          <input 
+            type="text" 
+            value={assignee} 
+            onChange={(e) => setAssignee(e.target.value)}
+            placeholder="ФИО или роль"
             className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
           />
         </div>

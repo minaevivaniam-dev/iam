@@ -85,7 +85,7 @@ function SortableTableRow({
   colWidths: Record<string, number>;
   hiddenCols: Set<string>;
   onUpdate: (id: string, field: string, val: any) => void;
-  onInsert: (idx: number, id: string) => void;
+  onInsert: (afterId: string, id: string) => number;
   onEditClick: (id: string, txt: string) => void;
   onTogglePlatform: (id: string, platformId: string) => void;
   onStatusChange: (id: string, status: Status) => void;
@@ -111,7 +111,7 @@ function SortableTableRow({
             <button className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-600 touch-none" {...attributes} {...listeners}><GripVertical size={16} /></button>
             <input type="date" value={row.date} onChange={(e) => onUpdate(row.id, 'date', e.target.value)} className="w-full bg-transparent outline-none text-slate-700 text-sm" />
           </div>
-          <button onClick={() => onInsert(row.id, row.id)} className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-20 hover:bg-blue-700"><Plus size={14} /></button>
+          <button onClick={() => { onInsert(row.id, row.id); }} className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-20 hover:bg-blue-700"><Plus size={14} /></button>
         </td>
       )}
 
@@ -296,6 +296,7 @@ export function TaskTable({
     const n = [...rows];
     n.splice(idx + 1, 0, newRow);
     setRows(n);
+    return idx + 1;
   };
 
   const updateCell = (id: string, field: string, value: any) => {
@@ -414,7 +415,7 @@ export function TaskTable({
             </thead>
             <tbody>
               <SortableContext items={rows.map(r => r.id)} strategy={verticalListSortingStrategy}>
-                {rows.map((row, index) => (
+                {rows.map((row) => (
                   <SortableTableRow
                     key={row.id}
                     row={row}
