@@ -9,6 +9,7 @@ import { TasksPage } from './pages/TasksPage';
 import { ContentPlan } from './pages/ContentPlan';
 import { TextPreparation } from './pages/TextPreparation';
 import { AttachmentPreparation } from './pages/AttachmentPreparation';
+import { TaskDetailLayout } from './components/TaskDetailLayout';
 import { useProjectStore } from './store/projectStore';
 import { useMediaPlanStore } from './store/mediaPlanStore';
 import {
@@ -17,6 +18,51 @@ import {
 } from 'lucide-react';
 
 type Tab = 'summary' | 'dashboard' | 'create-task' | 'graph' | 'mediaplan' | 'tasks' | 'analytics' | 'moderation' | 'ads';
+
+const PREPARATION_TASKS: Record<string, { title: string; description: string; assignee: string; notesPlaceholder: string; notesDefault: string }> = {
+  'audit-channels': {
+    title: 'Аудит действующих каналов Заказчика',
+    description: 'Определение текущего состояния каналов, сильных и слабых сторон, целевой аудитории, контентной матрицы и рекомендаций по развитию.',
+    assignee: 'Аналитик',
+    notesPlaceholder: 'Опишите аудит текущих каналов, сильные стороны, пробелы и рекомендации...',
+    notesDefault: '## Аудит действующих каналов Заказчика\n\n### 1. Общая характеристика каналов\n- \n\n### 2. Сильные стороны\n- \n\n### 3. Слабые стороны и риски\n- \n\n### 4. Рекомендации по развитию\n- ',
+  },
+  'rubricator-update': {
+    title: 'Актуализация рубрикатора',
+    description: 'Обновление структуры рубрик и категорий для логичного и целостного контентного позиционирования всех коммуникаций.',
+    assignee: 'Менеджер',
+    notesPlaceholder: 'Опишите актуальные рубрики, категории, ключевые темы и принципы их использования...',
+    notesDefault: '## Актуализация рубрикатора\n\n### Основные рубрики\n- \n\n### Принципы классификации\n- \n\n### Изменения относительно текущей структуры\n- ',
+  },
+  'tone-of-voice': {
+    title: 'Актуализация руководства по стилю коммуникации',
+    description: 'Формулирование принципов и правил подачи бренда: tone of voice, темп речи, язык, эмоции и коммуникационный стиль.',
+    assignee: 'Редактор',
+    notesPlaceholder: 'Опишите стиль коммуникации, ключевые принципы, формулировки и правила общения с аудиторией...',
+    notesDefault: '## Руководство по стилю коммуникации\n\n### Tone of voice\n- \n\n### Ключевые принципы\n- \n\n### Запрещенные/нежелательные формулировки\n- ',
+  },
+  'content-matrix': {
+    title: 'Актуализация контент-матрицы',
+    description: 'Проверка и обновление соответствия контента целям, аудиториям, форматам и стадиям воронки.',
+    assignee: 'Менеджер',
+    notesPlaceholder: 'Опишите актуальную контент-матрицу по темам, целям, аудиториям и форматам...',
+    notesDefault: '## Контент-матрица\n\n| Цель | Аудитория | Формат | Тема | Канал |\n| --- | --- | --- | --- | --- |\n|  |  |  |  |  |\n',
+  },
+  'visual-template-kit': {
+    title: 'Актуализация комплекта шаблонов визуального оформления публикаций',
+    description: 'Обновление визуальных шаблонов, правил оформления и единой системы графической коммуникации для публикаций.',
+    assignee: 'Дизайнер',
+    notesPlaceholder: 'Опишите актуальные визуальные шаблоны, палитру, правила и требования к оформлению публикаций...',
+    notesDefault: '## Комплект шаблонов визуального оформления\n\n### Базовые элементы\n- \n\n### Цветовая палитра\n- \n\n### Форматы и требования\n- ',
+  },
+  'strategic-document': {
+    title: 'Формирование и согласование якорного стратегического документа',
+    description: 'Вывод всех подготовительных материалов в единый стратегический документ с целями, позиционированием и планом действий.',
+    assignee: 'Менеджер',
+    notesPlaceholder: 'Опишите стратегические цели, позиции, приоритеты, дорожную карту и ключевые решения для согласования...',
+    notesDefault: '## Якорный стратегический документ\n\n### Цель и задачи\n- \n\n### Позиционирование\n- \n\n### Приоритеты на квартал\n- \n\n### Согласованные решения\n- ',
+  },
+};
 
 const TABS: { id: Tab; label: string; icon: React.ElementType<{ size?: number | string; className?: string }> }[] = [
   { id: 'summary', label: 'Сводная', icon: LayoutGrid },
@@ -81,6 +127,27 @@ function TasksRouter() {
   }
   if (selectedTaskId === 'create-materials') {
     return <CreateMaterialsPage onBack={() => setSelectedTaskId(null)} />;
+  }
+
+  if (selectedTaskId && PREPARATION_TASKS[selectedTaskId]) {
+    const task = PREPARATION_TASKS[selectedTaskId];
+    return (
+      <TaskDetailLayout
+        config={{
+          title: task.title,
+          assignee: task.assignee,
+          description: task.description,
+          metrics: { progress: 0, time: 0, quality: 0, cost: 0 },
+          columns: [],
+          initialRows: [],
+          mode: 'notes',
+          notesPlaceholder: task.notesPlaceholder,
+          notesDefault: task.notesDefault,
+        }}
+        taskPrefix={selectedTaskId}
+        onBack={() => setSelectedTaskId(null)}
+      />
+    );
   }
 
   return <TasksPage onOpenTask={(id) => setSelectedTaskId(id)} />;

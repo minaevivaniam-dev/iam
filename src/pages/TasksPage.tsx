@@ -32,6 +32,20 @@ const TASKS: TaskCard[] = [
       { id: 'create-materials', label: 'Создание материалов', icon: FileEdit },
     ],
   },
+  {
+    id: 'preparation-stage',
+    title: 'Подготовительный этап',
+    description: 'Подготовка базовых документов для запуска эффективной коммуникационной стратегии: аудит, рубрикатор, tone of voice, контент-матрица и стратегические основы.',
+    icon: FolderOpen,
+    subtasks: [
+      { id: 'audit-channels', label: 'Аудит действующих каналов Заказчика', icon: FileText },
+      { id: 'rubricator-update', label: 'Актуализация рубрикатора', icon: FileText },
+      { id: 'tone-of-voice', label: 'Актуализация руководства по стилю коммуникации', icon: FileText },
+      { id: 'content-matrix', label: 'Актуализация контент-матрицы', icon: FileText },
+      { id: 'visual-template-kit', label: 'Актуализация комплекта шаблонов визуального оформления публикаций', icon: FileText },
+      { id: 'strategic-document', label: 'Формирование и согласование якорного стратегического документа', icon: FileText },
+    ],
+  },
 ];
 
 export function TasksPage({ onOpenTask }: { onOpenTask: (taskId: string) => void }) {

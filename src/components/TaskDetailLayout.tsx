@@ -10,9 +10,12 @@ export interface TaskConfig {
   assignee: string;
   description: string;
   metrics: { progress: number; time: number; quality: number; cost: number };
-  columns: ColumnConfig[];
-  initialRows: TaskRow[];
+  columns?: ColumnConfig[];
+  initialRows?: TaskRow[];
   kpiTarget?: number;
+  mode?: 'table' | 'notes';
+  notesPlaceholder?: string;
+  notesDefault?: string;
 }
 
 const ASSIGNEES = [
@@ -29,6 +32,7 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
   const [reviewMap, setReviewMap] = useState<Map<string, ReviewData>>(new Map());
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
   const [descriptionText, setDescriptionText] = useState(config.description);
+  const [notesText, setNotesText] = useState(config.notesDefault ?? config.description);
   const [selectedAssignee, setSelectedAssignee] = useState(config.assignee);
 
   const handleReviewChange = useCallback((key: string, data: ReviewData) => {
@@ -174,17 +178,32 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
         </div>
       )}
 
-      {/* === ТАБЛИЦА === */}
+      {/* === ТАБЛИЦА / ТЕКСТОВЫЙ РЕДАКТОР === */}
       <div className="flex-1 min-h-0">
-        <ReviewableTable
-          taskPrefix={taskPrefix}
-          columns={config.columns}
-          initialRows={config.initialRows}
-          reviewMode={reviewMode}
-          reviewMap={reviewMap}
-          onReviewChange={handleReviewChange}
-          kpiTarget={config.kpiTarget}
-        />
+        {config.mode === 'notes' ? (
+          <div className="h-full rounded-2xl border border-slate-200 bg-white shadow-sm p-4 flex flex-col">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold text-slate-900">Текст документа</h2>
+              <span className="text-xs text-slate-500 px-2 py-1 rounded-full bg-slate-100 border border-slate-200">Черновик</span>
+            </div>
+            <textarea
+              value={notesText}
+              onChange={(e) => setNotesText(e.target.value)}
+              placeholder={config.notesPlaceholder ?? 'Введите текст документа...'}
+              className="w-full flex-1 min-h-[420px] resize-none rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 leading-6 outline-none transition focus:border-blue-400 focus:bg-white"
+            />
+          </div>
+        ) : (
+          <ReviewableTable
+            taskPrefix={taskPrefix}
+            columns={config.columns ?? []}
+            initialRows={config.initialRows ?? []}
+            reviewMode={reviewMode}
+            reviewMap={reviewMap}
+            onReviewChange={handleReviewChange}
+            kpiTarget={config.kpiTarget}
+          />
+        )}
       </div>
     </div>
   );
