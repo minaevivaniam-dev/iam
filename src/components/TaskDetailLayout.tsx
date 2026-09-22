@@ -209,10 +209,11 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
         throw error;
       }
 
-      const { data } = supabase.storage.from('documents').getPublicUrl(storagePath);
+      const { data, error: signedUrlError } = await supabase.storage.from('documents').createSignedUrl(storagePath, 3600);
+      if (signedUrlError) throw signedUrlError;
       uploadedDoc = {
         ...uploadedDoc,
-        url: data?.publicUrl || '',
+        url: data?.signedUrl || '',
       };
     } catch {
       const dataUrl = await fileToDataUrl(file);
@@ -239,8 +240,13 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
     event.target.value = '';
   };
 
-  const handleDownload = (doc: UploadedDocument) => {
-    const url = doc.url || doc.dataUrl;
+  const handleDownload = async (doc: UploadedDocument) => {
+    let url = doc.url || doc.dataUrl;
+
+    if (doc.storagePath) {
+      const { data } = await supabase.storage.from('documents').createSignedUrl(doc.storagePath, 3600);
+      url = data?.signedUrl || url;
+    }
 
     if (!url) return;
 

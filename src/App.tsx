@@ -12,6 +12,9 @@ import { AttachmentPreparation } from './pages/AttachmentPreparation';
 import { TaskDetailLayout } from './components/TaskDetailLayout';
 import { useProjectStore } from './store/projectStore';
 import { useMediaPlanStore } from './store/mediaPlanStore';
+import { AuthPage } from './components/AuthPage';
+import { supabase } from './lib/supabase';
+import type { Session } from '@supabase/supabase-js';
 import {
   BarChart3, CalendarDays, PieChart, ShieldCheck, Megaphone,
   LayoutGrid, ArrowRight, ListChecks
@@ -161,7 +164,7 @@ function TasksRouter() {
   return <TasksPage onOpenTask={(id) => setSelectedTaskId(id)} />;
 }
 
-function AppContent() {
+function AppContent({ session }: { session: Session }) {
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const saved = localStorage.getItem('activeTab');
     return (saved && TABS.some(t => t.id === saved)) ? saved as Tab : 'summary';
@@ -193,17 +196,23 @@ function AppContent() {
   return (
     <div className="h-screen bg-slate-50 flex flex-col text-left overflow-hidden">
       <nav className="bg-white border-b border-slate-200 px-6 shrink-0 z-30">
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
-          {TABS.map(tab => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-4 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${isActive ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'}`}>
-                <Icon size={16} />{tab.label}
-              </button>
-            );
-          })}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+            {TABS.map(tab => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 px-4 py-4 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${isActive ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'}`}>
+                  <Icon size={16} />{tab.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <span className="hidden md:block text-xs text-slate-500 max-w-48 truncate">{session.user.email}</span>
+            <button onClick={() => { void supabase.auth.signOut(); }} className="text-xs font-medium text-slate-600 border border-slate-200 rounded-lg px-3 py-2 hover:bg-slate-50">Выйти</button>
+          </div>
         </div>
       </nav>
 
@@ -261,5 +270,31 @@ function AppContent() {
   );
 }
 
-function App() { return <ErrorBoundary><AppContent /></ErrorBoundary>; }
+function App() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      setSession(data.session);
+      setAuthLoading(false);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      setAuthLoading(false);
+    });
+
+    return () => {
+      mounted = false;
+      listener.subscription.unsubscribe();
+    };
+  }, []);
+
+  if (authLoading) return <div className="min-h-screen bg-slate-100 flex items-center justify-center text-slate-500">Проверка авторизации...</div>;
+  if (!session) return <AuthPage />;
+  return <ErrorBoundary><AppContent session={session} /></ErrorBoundary>;
+}
 export default App;

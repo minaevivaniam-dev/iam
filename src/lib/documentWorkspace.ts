@@ -336,8 +336,9 @@ export async function uploadFileToStorage(taskId: string, file: File): Promise<U
       contentType: file.type || 'application/octet-stream',
     });
     if (error) throw error;
-    const { data } = supabase.storage.from('documents').getPublicUrl(storagePath);
-    return { ...document, url: data.publicUrl };
+    const { data, error: signedUrlError } = await supabase.storage.from('documents').createSignedUrl(storagePath, 3600);
+    if (signedUrlError) throw signedUrlError;
+    return { ...document, url: data.signedUrl };
   } catch {
     return { ...document, dataUrl: await fileToDataUrl(file) };
   }
