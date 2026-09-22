@@ -1,23 +1,34 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Text } from '@react-three/drei';
+import { Html, OrbitControls, Text } from '@react-three/drei';
 import * as THREE from 'three';
 
 type GanttTask = {
   title: string;
   startDay: number;
   duration: number;
+  startDate: string;
+  endDate: string;
+  taskId: string;
 };
 
 const PREPARATION_TASKS: GanttTask[] = [
-  { title: 'Аудит каналов', startDay: 1, duration: 6 },
-  { title: 'Рубрикатор', startDay: 0, duration: 7 },
-  { title: 'Tone of voice', startDay: 3, duration: 4 },
-  { title: 'Визуальные шаблоны', startDay: 7, duration: 5 },
-  { title: 'Концепция каналов', startDay: 8, duration: 3 },
-  { title: 'Графические материалы', startDay: 10, duration: 7 },
-  { title: 'Страницы сообществ', startDay: 24, duration: 1 },
+  { title: 'Аудит каналов', startDay: 1, duration: 6, startDate: '15.09.2026', endDate: '22.09.2026', taskId: 'audit-channels' },
+  { title: 'Рубрикатор', startDay: 0, duration: 7, startDate: '14.09.2026', endDate: '22.09.2026', taskId: 'rubricator-update' },
+  { title: 'Tone of voice', startDay: 3, duration: 4, startDate: '17.09.2026', endDate: '22.09.2026', taskId: 'tone-of-voice' },
+  { title: 'Визуальные шаблоны', startDay: 7, duration: 5, startDate: '21.09.2026', endDate: '25.09.2026', taskId: 'visual-template-kit' },
+  { title: 'Концепция каналов', startDay: 8, duration: 3, startDate: '22.09.2026', endDate: '24.09.2026', taskId: 'channel-concept' },
+  { title: 'Графические материалы', startDay: 10, duration: 7, startDate: '24.09.2026', endDate: '02.10.2026', taskId: 'graphic-materials' },
+  { title: 'Страницы сообществ', startDay: 24, duration: 1, startDate: '08.10.2026', endDate: '08.10.2026', taskId: 'community-pages' },
 ];
+
+const timelineStart = new Date(Date.UTC(2026, 8, 14));
+
+function formatDate(day: number) {
+  const date = new Date(timelineStart);
+  date.setUTCDate(timelineStart.getUTCDate() + day);
+  return `${String(date.getUTCDate()).padStart(2, '0')}.${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
 
 function AxisLine({ start, end }: { start: [number, number, number]; end: [number, number, number] }) {
   return (
@@ -30,28 +41,29 @@ function AxisLine({ start, end }: { start: [number, number, number]; end: [numbe
   );
 }
 
-function CoordinateSystem({ axisLength }: { axisLength: number }) {
+function CoordinateSystem({ axisLength, qualityLength }: { axisLength: number; qualityLength: number }) {
   return (
     <group>
       <AxisLine start={[-1, 0, 0]} end={[axisLength, 0, 0]} />
       <AxisLine start={[0, 0, 0]} end={[0, 3, 0]} />
-      <AxisLine start={[0, 0, 0]} end={[0, 0, -3]} />
+      <AxisLine start={[0, 0, 0]} end={[0, 0, -qualityLength]} />
       <Text position={[axisLength + 1, 0, 0]} fontSize={0.55} color="#cbd5e1">Время, дни (X)</Text>
       <Text position={[0, 3.5, 0]} fontSize={0.55} color="#cbd5e1">Бюджет (Y)</Text>
-      <Text position={[0, 0, -3.6]} fontSize={0.55} color="#cbd5e1" rotation={[0, Math.PI / 2, 0]}>Качество (Z)</Text>
+      <Text position={[0, 0, -qualityLength - 0.7]} fontSize={0.55} color="#cbd5e1" rotation={[0, Math.PI / 2, 0]}>Качество (Z)</Text>
       <gridHelper args={[axisLength, axisLength, '#334155', '#1e293b']} position={[(axisLength - 1) / 2, 0, 0]} />
       {Array.from({ length: axisLength + 1 }, (_, day) => (
-        <Text key={day} position={[day, -0.45, 0]} fontSize={0.28} color="#94a3b8">{day}</Text>
+        day % 2 === 0 ? <Text key={day} position={[day, -0.45, 0]} fontSize={0.27} color="#94a3b8">{formatDate(day)}</Text> : null
       ))}
       {[0, 1, 2].map((value) => <Text key={value} position={[-0.4, value + 0.5, 0]} fontSize={0.3} color="#94a3b8">{value}</Text>)}
     </group>
   );
 }
 
-function GanttCube({ task }: { task: GanttTask }) {
+function GanttCube({ task, index, onOpenTask }: { task: GanttTask; index: number; onOpenTask: (taskId: string) => void }) {
+  const [isHovered, setIsHovered] = useState(false);
   const lineRef = useRef<THREE.LineSegments>(null);
   const size: [number, number, number] = [task.duration, 1, 1];
-  const position: [number, number, number] = [task.startDay + task.duration / 2, 0.5, -0.5];
+  const position: [number, number, number] = [task.startDay + task.duration / 2, 0.5, -(index * 2 + 0.5)];
 
   useEffect(() => {
     lineRef.current?.computeLineDistances();
@@ -68,7 +80,7 @@ function GanttCube({ task }: { task: GanttTask }) {
   ];
 
   return (
-    <group position={position}>
+    <group position={position} onPointerOver={(event) => { event.stopPropagation(); setIsHovered(true); }} onPointerOut={() => setIsHovered(false)} onClick={(event) => { event.stopPropagation(); onOpenTask(task.taskId); }}>
       <mesh>
         <boxGeometry args={size} />
         <meshBasicMaterial color="#22c55e" transparent opacity={0.035} depthWrite={false} />
@@ -80,13 +92,25 @@ function GanttCube({ task }: { task: GanttTask }) {
         <lineDashedMaterial color="#4ade80" transparent opacity={0.85} dashSize={0.18} gapSize={0.12} linewidth={1} />
       </lineSegments>
       <Text position={[0, 0.72, -0.52]} fontSize={0.3} color="#86efac" anchorX="center" anchorY="middle" maxWidth={Math.max(1.2, task.duration - 0.2)}>{task.title}</Text>
-      <Text position={[0, -0.72, 0]} fontSize={0.25} color="#86efac" anchorX="center">{task.duration} дн.</Text>
+      <Text position={[0, -0.72, 0]} fontSize={0.25} color="#86efac" anchorX="center">{task.startDate} - {task.endDate}</Text>
+      {isHovered && (
+        <Html distanceFactor={8} position={[0, 1.3, 0]} center>
+          <div className="pointer-events-none w-56 rounded-lg border border-emerald-400/60 bg-slate-950/95 p-3 text-left text-xs text-slate-200 shadow-xl">
+            <p className="font-semibold text-emerald-300">{task.title}</p>
+            <p className="mt-1">Срок: {task.startDate} - {task.endDate}</p>
+            <p>Рабочих дней: {task.duration}</p>
+            <p>Бюджет: 1 · Качество: 1</p>
+            <p className="mt-2 text-emerald-400">Нажмите кубик, чтобы открыть задачу</p>
+          </div>
+        </Html>
+      )}
     </group>
   );
 }
 
-export function CubeScene() {
+export function CubeScene({ onOpenTask }: { onOpenTask: (taskId: string) => void }) {
   const axisLength = 27;
+  const qualityLength = PREPARATION_TASKS.length * 2;
 
   return (
     <div style={{ width: '100%', height: '100%', minHeight: '500px', background: '#0f172a', borderRadius: '12px', position: 'relative' }}>
@@ -98,8 +122,8 @@ export function CubeScene() {
         <ambientLight intensity={0.55} />
         <directionalLight position={[10, 15, 10]} intensity={1.5} />
         <pointLight position={[-10, 8, -8]} intensity={0.8} color="#60a5fa" />
-        <CoordinateSystem axisLength={axisLength} />
-        {PREPARATION_TASKS.map((task) => <GanttCube key={task.title} task={task} />)}
+        <CoordinateSystem axisLength={axisLength} qualityLength={qualityLength} />
+        {PREPARATION_TASKS.map((task, index) => <GanttCube key={task.title} task={task} index={index} onOpenTask={onOpenTask} />)}
         <OrbitControls enablePan enableZoom enableRotate minDistance={10} maxDistance={65} />
       </Canvas>
     </div>

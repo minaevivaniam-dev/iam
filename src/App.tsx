@@ -65,6 +65,27 @@ const PREPARATION_TASKS: Record<string, { title: string; description: string; as
     notesPlaceholder: 'Опишите стратегические цели, позиции, приоритеты, дорожную карту и ключевые решения для согласования...',
     notesDefault: '## Якорный стратегический документ\n\n### Цель и задачи\n- \n\n### Позиционирование\n- \n\n### Приоритеты на квартал\n- \n\n### Согласованные решения\n- ',
   },
+  'channel-concept': {
+    title: 'Утверждение концепции новых каналов',
+    description: 'Утверждение названий, рубрикатора и общей концепции новых каналов коммуникации.',
+    assignee: 'Менеджер',
+    notesPlaceholder: 'Опишите концепцию, названия, рубрикатор и ключевые решения по новым каналам...',
+    notesDefault: '## Концепция новых каналов\n\n### Названия\n- \n\n### Рубрикатор\n- \n\n### Концепция\n- ',
+  },
+  'graphic-materials': {
+    title: 'Разработка графических материалов',
+    description: 'Подготовка аватара, обложки и системы брендинга публикаций.',
+    assignee: 'Дизайнер',
+    notesPlaceholder: 'Опишите графические материалы, форматы, промежуточные результаты и требования...',
+    notesDefault: '## Графические материалы\n\n### Аватар\n- \n\n### Обложка\n- \n\n### Брендинг публикаций\n- ',
+  },
+  'community-pages': {
+    title: 'Создание страниц сообществ в социальных сетях',
+    description: 'Создание и первичная настройка страниц сообществ для выбранных каналов.',
+    assignee: 'Менеджер',
+    notesPlaceholder: 'Укажите созданные сообщества, ссылки, статусы и оставшиеся настройки...',
+    notesDefault: '## Страницы сообществ\n\n### Каналы\n- \n\n### Ссылки\n- \n\n### Статус настройки\n- ',
+  },
 };
 
 const TABS: { id: Tab; label: string; icon: React.ElementType<{ size?: number | string; className?: string }> }[] = [
@@ -250,7 +271,7 @@ function AppContent({ session }: { session: Session }) {
         {activeTab === 'graph' && (
           <div className="flex-1 flex flex-col min-h-0">
             <h1 className="text-2xl font-bold text-slate-900 mb-4 shrink-0">Система координат проекта</h1>
-            <div className="flex-1 min-h-[400px]"><CubeScene /></div>
+            <div className="flex-1 min-h-[400px]"><CubeScene onOpenTask={(taskId) => { localStorage.setItem('activeTab', 'tasks'); localStorage.setItem('selectedTaskId', taskId); setActiveTab('tasks'); }} /></div>
           </div>
         )}
         {activeTab === 'mediaplan' && (

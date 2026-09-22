@@ -44,6 +44,9 @@ const TASKS: TaskCard[] = [
       { id: 'content-matrix', label: 'Актуализация контент-матрицы', icon: FileText },
       { id: 'visual-template-kit', label: 'Актуализация комплекта шаблонов визуального оформления публикаций', icon: FileText },
       { id: 'strategic-document', label: 'Формирование и согласование якорного стратегического документа', icon: FileText },
+      { id: 'channel-concept', label: 'Утверждение концепции новых каналов', icon: FileText },
+      { id: 'graphic-materials', label: 'Разработка графических материалов', icon: FileText },
+      { id: 'community-pages', label: 'Создание страниц сообществ в социальных сетях', icon: FileText },
     ],
   },
 ];
