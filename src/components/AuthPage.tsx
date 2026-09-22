@@ -45,9 +45,24 @@ export function AuthPage() {
         .eq('id', result.data.user.id)
         .maybeSingle();
 
-      if (profileError || !profile || profile.role !== role) {
+      if (profileError) {
         await supabase.auth.signOut();
-        setError('Для этого аккаунта выбрана другая роль. Проверьте роль и повторите вход.');
+        setError(`Не удалось загрузить роль аккаунта: ${profileError.message}`);
+        setBusy(false);
+        return;
+      }
+
+      if (!profile) {
+        await supabase.auth.signOut();
+        setError('Для аккаунта не найден профиль. Выполните SQL миграцию profiles в Supabase и повторите вход.');
+        setBusy(false);
+        return;
+      }
+
+      if (profile.role !== role) {
+        await supabase.auth.signOut();
+        const selectedRole = ROLES.find((item) => item.id === profile.role)?.label ?? profile.role;
+        setError(`У этого аккаунта роль «${selectedRole}». Выберите её в форме входа.`);
         setBusy(false);
         return;
       }
