@@ -17,7 +17,9 @@ import {
   persistActivity,
   persistDocument,
   readDocument,
+  uploadFileToStorage,
   writeDocument,
+  type UploadedDocument,
 } from '../lib/documentWorkspace';
 
 type Status = 'запланирован' | 'в работе' | 'на согласовании' | 'опубликован' | 'отменен';
@@ -145,7 +147,7 @@ function CommentBubble({
 function ReviewableRow({
   row, columns, colWidths, hiddenCols, reviewMode, reviewMap,
   onUpdate, onInsert, onTogglePlatform, onStatusChange,
-  onCellClick
+  onCellClick, onAttachmentUpload
 }: {
   row: TaskRow; columns: ColumnConfig[]; colWidths: Record<string, number>;
   hiddenCols: Set<string>; reviewMode: boolean;
@@ -154,6 +156,7 @@ function ReviewableRow({
   onInsert: (id: string) => void;
   onTogglePlatform: (id: string, platformId: string) => void;
   onStatusChange: (id: string, status: Status) => void;
+  onAttachmentUpload: (id: string, field: string, file: File) => void;
   onCellClick: (rowId: string, colKey: string, zone: 'top' | 'bottom-left' | 'bottom-right', event: React.MouseEvent) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: row.id });
@@ -251,7 +254,7 @@ function ReviewableRow({
           {[1, 2, 3].map((si) => (
             <label key={si} className="w-8 h-8 border-2 border-dashed border-slate-300 rounded flex items-center justify-center text-slate-300 hover:border-blue-400 hover:text-blue-400 cursor-pointer transition-colors relative overflow-hidden" title={`Слот ${si}`}>
               {si === 1 ? <ImageIcon size={14} /> : si === 2 ? <Video size={14} /> : <FileText size={14} />}
-              <input type="file" accept="image/*,video/*,.pdf,.doc,.docx" className="absolute inset-0 opacity-0 cursor-pointer" />
+              <input type="file" accept="image/*,video/*,.pdf,.doc,.docx" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => { const file = e.target.files?.[0]; if (file) onAttachmentUpload(row.id, col.key, file); e.target.value = ''; }} />
             </label>
           ))}
         </div>
@@ -416,14 +419,14 @@ export function ReviewableTable({
     const next = {
       ...current,
       taskId: taskPrefix,
-      content: JSON.stringify({ rows: rowsRef.current }),
+      content: JSON.stringify({ rows: rowsRef.current, reviewMap: Object.fromEntries(reviewMap.entries()) }),
       updatedAt: new Date().toISOString(),
     };
     writeDocument(taskPrefix, next);
     const saved = await persistDocument(taskPrefix, next);
     await persistActivity(taskPrefix, 'table-save', 'Таблица сохранена');
     return saved;
-  }, [taskPrefix]);
+  }, [reviewMap, taskPrefix]);
 
   useEffect(() => {
     let isMounted = true;
@@ -432,8 +435,13 @@ export function ReviewableTable({
       if (!isMounted) return;
 
       try {
-        const parsed = JSON.parse(document.content) as { rows?: TaskRow[] };
+        const parsed = JSON.parse(document.content) as { rows?: TaskRow[]; reviewMap?: Record<string, ReviewData> };
         if (Array.isArray(parsed.rows)) setRows(parsed.rows);
+        if (parsed.reviewMap && typeof parsed.reviewMap === 'object') {
+          Object.entries(parsed.reviewMap).forEach(([key, data]) => {
+            onReviewChange(key, data as ReviewData);
+          });
+        }
       } catch {
         // Existing non-table documents keep their initial rows.
       }
@@ -441,7 +449,7 @@ export function ReviewableTable({
     };
     void hydrateRows();
     return () => { isMounted = false; };
-  }, [taskPrefix]);
+  }, [onReviewChange, taskPrefix]);
 
   useEffect(() => {
     onSaveReady?.(saveRows);
@@ -454,7 +462,7 @@ export function ReviewableTable({
     return () => {
       if (saveTimer.current) window.clearTimeout(saveTimer.current);
     };
-  }, [rows, saveRows]);
+  }, [reviewMap, rows, saveRows]);
 
   const kpiField = columns.find(c => c.isKpiField);
   const kpiCount = kpiField ? rows.filter(r => r[kpiField.key] && String(r[kpiField.key]).trim().length > 0).length : 0;
@@ -544,6 +552,15 @@ export function ReviewableTable({
     const row = rows.find(r => r.id === rowId); if (!row) return;
     const current: string[] = row.platforms || [];
     updateCell(rowId, 'platforms', current.includes(platformId) ? current.filter(p => p !== platformId) : [...current, platformId]);
+  };
+
+  const handleAttachmentUpload = async (rowId: string, field: string, file: File) => {
+    const uploaded = await uploadFileToStorage(taskPrefix, file);
+    setRows((currentRows) => currentRows.map((row) => {
+      if (row.id !== rowId) return row;
+      const existing = Array.isArray(row[field]) ? row[field] as UploadedDocument[] : [];
+      return { ...row, [field]: [...existing, uploaded] };
+    }));
   };
 
   // Функция openTextEdit удалена как неиспользуемая
@@ -644,7 +661,7 @@ export function ReviewableTable({
                     hiddenCols={hiddenCols} reviewMode={reviewMode} reviewMap={reviewMap}
                     onUpdate={updateCell} onInsert={insertRow}
                     onTogglePlatform={togglePlatform} onStatusChange={onStatusChange}
-                    onCellClick={handleCellClick}
+                    onCellClick={handleCellClick} onAttachmentUpload={handleAttachmentUpload}
                   />
                 ))}
               </SortableContext>

@@ -9,7 +9,7 @@ interface ProjectState {
   error: string | null;
 
   fetchData: () => Promise<void>;
-  addTask: (task: ProjectTask) => Promise<void>;
+  addTask: (task: ProjectTask) => Promise<boolean>;
   updateTask: (id: string, updates: Partial<ProjectTask>) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
   addExecutor: (executor: Executor) => Promise<void>;
@@ -111,10 +111,11 @@ export const useProjectStore = create<ProjectState>((set) => ({
     if (error) {
       console.error('[Store] Ошибка добавления:', error.message);
       alert('Ошибка сохранения: ' + error.message);
-      return;
+      return false;
     }
     set((state) => ({ tasks: [...state.tasks, task] }));
     console.log('[Store] Задача сохранена в Supabase');
+    return true;
   },
 
   updateTask: async (id, updates) => {

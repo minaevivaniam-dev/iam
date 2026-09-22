@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor,
   useSensor, useSensors, DragOverlay, defaultDropAnimationSideEffects
@@ -8,6 +8,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Plus, GripVertical, ChevronLeft, RotateCcw } from 'lucide-react';
+import { loadRemoteDocument, persistDocument, readDocument, writeDocument } from '../lib/documentWorkspace';
 
 type Status = 'запланирован' | 'в работе' | 'на согласовании' | 'опубликован' | 'отменен';
 
@@ -144,6 +145,42 @@ export function SmiTaskTable({ taskPrefix, rowCount = 20, hiddenCols, onToggleHi
   const resizingCol = useRef<string | null>(null);
   const startX = useRef(0);
   const startWidth = useRef(0);
+  const rowsRef = useRef(rows);
+  const hydratedRef = useRef(false);
+  const saveTimer = useRef<number | null>(null);
+
+  rowsRef.current = rows;
+
+  const saveRows = useCallback(async () => {
+    const current = readDocument(taskPrefix, taskPrefix);
+    const next = { ...current, taskId: taskPrefix, content: JSON.stringify({ rows: rowsRef.current }), updatedAt: new Date().toISOString() };
+    writeDocument(taskPrefix, next);
+    await persistDocument(taskPrefix, next);
+  }, [taskPrefix]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const hydrateRows = async () => {
+      const document = await loadRemoteDocument(taskPrefix, taskPrefix);
+      if (!isMounted) return;
+      try {
+        const parsed = JSON.parse(document.content) as { rows?: SmiRow[] };
+        if (Array.isArray(parsed.rows)) setRows(parsed.rows);
+      } catch {
+        // Keep generated rows for a new table.
+      }
+      hydratedRef.current = true;
+    };
+    void hydrateRows();
+    return () => { isMounted = false; };
+  }, [taskPrefix]);
+
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => { void saveRows(); }, 700);
+    return () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); };
+  }, [rows, saveRows]);
 
   const handleMouseDown = (e: React.MouseEvent, col: string) => {
     if (hiddenCols.has(col)) return;
@@ -180,7 +217,7 @@ export function SmiTaskTable({ taskPrefix, rowCount = 20, hiddenCols, onToggleHi
     const n = [...rows]; n.splice(idx + 1, 0, newRow); setRows(n);
   };
   const updateCell = (id: string, field: string, value: any) => {
-    setRows(rows.map(r => r.id === id ? { ...r, [field]: value } : r));
+    setRows(currentRows => currentRows.map(r => r.id === id ? { ...r, [field]: value } : r));
   };
 
   const activeRow = activeId ? rows.find(r => r.id === activeId) : null;

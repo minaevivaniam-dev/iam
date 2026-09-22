@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor,
   useSensor, useSensors, DragOverlay, defaultDropAnimationSideEffects
@@ -11,6 +11,7 @@ import {
   Plus, GripVertical, Image as ImageIcon, Video, FileText, Check,
   Send, MessageCircle, LayoutGrid, ChevronLeft, RotateCcw, X, Bold, Italic, List
 } from 'lucide-react';
+import { loadRemoteDocument, persistDocument, readDocument, uploadFileToStorage, writeDocument, type UploadedDocument } from '../lib/documentWorkspace';
 
 type Status = 'запланирован' | 'в работе' | 'на согласовании' | 'опубликован' | 'отменен';
 
@@ -19,7 +20,7 @@ interface TaskRow {
   date: string;
   rubric: string;
   platforms: string[];
-  attachments: number;
+  attachments: number | UploadedDocument[];
   description: string;
   text: string;
   status: Status;
@@ -79,7 +80,7 @@ function generateRows(prefix: string, count = 30): TaskRow[] {
 }
 
 function SortableTableRow({
-  row, colWidths, hiddenCols, onUpdate, onInsert, onEditClick, onTogglePlatform, onStatusChange
+  row, colWidths, hiddenCols, onUpdate, onInsert, onEditClick, onTogglePlatform, onStatusChange, onAttachmentUpload
 }: {
   row: TaskRow;
   colWidths: Record<string, number>;
@@ -89,6 +90,7 @@ function SortableTableRow({
   onEditClick: (id: string, txt: string) => void;
   onTogglePlatform: (id: string, platformId: string) => void;
   onStatusChange: (id: string, status: Status) => void;
+  onAttachmentUpload: (id: string, file: File) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: row.id });
   const style = {
@@ -183,7 +185,7 @@ function SortableTableRow({
             {[1, 2, 3].map((si) => (
               <label key={si} className="w-8 h-8 border-2 border-dashed border-slate-300 rounded flex items-center justify-center text-slate-300 hover:border-blue-400 hover:text-blue-400 cursor-pointer transition-colors relative overflow-hidden" title={`Слот ${si}`}>
                 {si === 1 ? <ImageIcon size={14} /> : si === 2 ? <Video size={14} /> : <FileText size={14} />}
-                <input type="file" accept="image/*,video/*,.pdf,.doc,.docx" className="absolute inset-0 opacity-0 cursor-pointer" />
+                <input type="file" accept="image/*,video/*,.pdf,.doc,.docx" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => { const file = e.target.files?.[0]; if (file) onAttachmentUpload(row.id, file); e.target.value = ''; }} />
               </label>
             ))}
           </div>
@@ -224,6 +226,42 @@ export function TaskTable({
   const startX = useRef(0);
   const startWidth = useRef(0);
   const editorRef = useRef<HTMLDivElement>(null);
+  const rowsRef = useRef(rows);
+  const hydratedRef = useRef(false);
+  const saveTimer = useRef<number | null>(null);
+
+  rowsRef.current = rows;
+
+  const saveRows = useCallback(async () => {
+    const current = readDocument(taskPrefix, taskPrefix);
+    const next = { ...current, taskId: taskPrefix, content: JSON.stringify({ rows: rowsRef.current }), updatedAt: new Date().toISOString() };
+    writeDocument(taskPrefix, next);
+    await persistDocument(taskPrefix, next);
+  }, [taskPrefix]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const hydrateRows = async () => {
+      const document = await loadRemoteDocument(taskPrefix, taskPrefix);
+      if (!isMounted) return;
+      try {
+        const parsed = JSON.parse(document.content) as { rows?: TaskRow[] };
+        if (Array.isArray(parsed.rows)) setRows(parsed.rows);
+      } catch {
+        // Keep generated rows for a new table.
+      }
+      hydratedRef.current = true;
+    };
+    void hydrateRows();
+    return () => { isMounted = false; };
+  }, [taskPrefix]);
+
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => { void saveRows(); }, 700);
+    return () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); };
+  }, [rows, saveRows]);
 
   const handleMouseDown = (e: React.MouseEvent, col: string) => {
     if (hiddenCols.has(col)) return;
@@ -300,7 +338,7 @@ export function TaskTable({
   };
 
   const updateCell = (id: string, field: string, value: any) => {
-    setRows(rows.map(r => r.id === id ? { ...r, [field]: value } : r));
+    setRows(currentRows => currentRows.map(r => r.id === id ? { ...r, [field]: value } : r));
   };
 
   const onStatusChange = (id: string, status: Status) => updateCell(id, 'status', status);
@@ -312,6 +350,15 @@ export function TaskTable({
       ? row.platforms.filter(p => p !== platformId)
       : [...row.platforms, platformId];
     updateCell(rowId, 'platforms', newPlatforms);
+  };
+
+  const handleAttachmentUpload = async (rowId: string, file: File) => {
+    const uploaded = await uploadFileToStorage(taskPrefix, file);
+    setRows(currentRows => currentRows.map(row => {
+      if (row.id !== rowId) return row;
+      const existing = Array.isArray(row.attachments) ? row.attachments : [];
+      return { ...row, attachments: [...existing, uploaded] };
+    }));
   };
 
   const openTextEdit = (id: string, t: string) => { setEditingCell(id); setTempText(t); };
@@ -426,6 +473,7 @@ export function TaskTable({
                     onEditClick={openTextEdit}
                     onTogglePlatform={togglePlatform}
                     onStatusChange={onStatusChange}
+                    onAttachmentUpload={handleAttachmentUpload}
                   />
                 ))}
               </SortableContext>

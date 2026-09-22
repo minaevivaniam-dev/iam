@@ -9,6 +9,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { Plus, X, Bold, Italic, List, Image as ImageIcon, Video, FileText, Check, GripVertical, Save } from 'lucide-react';
 import { useMediaPlanStore } from '../store/mediaPlanStore';
+import { uploadFileToStorage, type UploadedDocument } from '../lib/documentWorkspace';
 
 type Status = 'запланирован' | 'в работе' | 'на согласовании' | 'опубликован' | 'отменен';
 type Platform = 'ВК' | 'Telegram' | 'МАКС' | 'Дзен' | 'VC.ru';
@@ -19,7 +20,7 @@ interface MediaRow {
   date: string;
   status: Status;
   rubric: string;
-  attachments: number;
+  attachments: number | UploadedDocument[];
   platforms: Platform[];
   text: string;
 }
@@ -48,11 +49,12 @@ function RichTextCell({ html, maxWidth }: { html: string; maxWidth: number }) {
   );
 }
 
-function SortableTableRow({ row, index, colWidths, onUpdate, onInsert, onEditClick }: {
+function SortableTableRow({ row, index, colWidths, onUpdate, onInsert, onEditClick, onAttachmentUpload }: {
   row: MediaRow; index: number; colWidths: Record<string, number>;
   onUpdate: (id: string, field: keyof MediaRow, val: any) => void;
   onInsert: (idx: number) => void;
   onEditClick: (id: string, txt: string) => void;
+  onAttachmentUpload: (id: string, file: File) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: row.id });
   const style = { transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 50 : 'auto', opacity: isDragging ? 0.9 : 1, boxShadow: isDragging ? '0 10px 25px -5px rgba(0,0,0,0.1)' : 'none', backgroundColor: isDragging ? '#f8fafc' : 'transparent' };
@@ -75,7 +77,7 @@ function SortableTableRow({ row, index, colWidths, onUpdate, onInsert, onEditCli
       </td>
       <td className="px-3 py-2 border-r border-slate-200" style={{ width: colWidths.rubric }}><input type="text" value={row.rubric} onChange={(e) => onUpdate(row.id, 'rubric', e.target.value)} placeholder="Рубрика..." className="w-full bg-transparent outline-none text-slate-700 placeholder:text-slate-300 text-sm" /></td>
       <td className="px-3 py-2 border-r border-slate-200" style={{ width: colWidths.attach }}>
-        <div className="flex gap-2">{[1, 2, 3].map((si) => (<label key={si} className="w-8 h-8 border-2 border-dashed border-slate-300 rounded flex items-center justify-center text-slate-300 hover:border-blue-400 hover:text-blue-400 cursor-pointer transition-colors relative overflow-hidden" title={`Слот ${si}`}>{si === 1 ? <ImageIcon size={14} /> : si === 2 ? <Video size={14} /> : <FileText size={14} />}<input type="file" accept="image/*,video/*,.pdf,.doc,.docx" className="absolute inset-0 opacity-0 cursor-pointer" /></label>))}</div>
+        <div className="flex gap-2">{[1, 2, 3].map((si) => (<label key={si} className="w-8 h-8 border-2 border-dashed border-slate-300 rounded flex items-center justify-center text-slate-300 hover:border-blue-400 hover:text-blue-400 cursor-pointer transition-colors relative overflow-hidden" title={`Слот ${si}`}>{si === 1 ? <ImageIcon size={14} /> : si === 2 ? <Video size={14} /> : <FileText size={14} />}<input type="file" accept="image/*,video/*,.pdf,.doc,.docx" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => { const file = e.target.files?.[0]; if (file) onAttachmentUpload(row.id, file); e.target.value = ''; }} /></label>))}</div>
       </td>
       <td className="px-3 py-2 border-r border-slate-200" style={{ width: colWidths.platform }}>
         <div className="flex flex-wrap gap-1">{(['ВК', 'Telegram', 'МАКС', 'Дзен', 'VC.ru'] as Platform[]).map(p => (<label key={p} className="flex items-center gap-1 cursor-pointer select-none"><div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${row.platforms.includes(p) ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white'}`}>{row.platforms.includes(p) && <Check size={10} className="text-white" />}</div><input type="checkbox" checked={row.platforms.includes(p)} onChange={() => { const ps = row.platforms.includes(p) ? row.platforms.filter(x => x !== p) : [...row.platforms, p]; onUpdate(row.id, 'platforms', ps); }} className="hidden" /><span className="text-xs text-slate-600">{p}</span></label>))}</div>
@@ -109,7 +111,7 @@ function SingleMediaTable({ tabPrefix }: { tabPrefix: string }) {
     if (!initialized.current) {
       const filtered = storeRows.filter(r => r.id.startsWith(tabPrefix));
       if (filtered.length > 0) {
-        setRows(filtered.map(r => ({ id: r.id, date: r.date || '', status: (r.status as Status) || 'запланирован', rubric: r.rubric || '', attachments: 3, platforms: (r.platforms as Platform[]) || [], text: r.text_content || '' })));
+        setRows(filtered.map(r => ({ id: r.id, date: r.date || '', status: (r.status as Status) || 'запланирован', rubric: r.rubric || '', attachments: r.attachments?.length ? r.attachments : 3, platforms: (r.platforms as Platform[]) || [], text: r.text_content || '' })));
       } else {
         setRows(generateInitialRows(tabPrefix));
       }
@@ -168,9 +170,9 @@ function SingleMediaTable({ tabPrefix }: { tabPrefix: string }) {
       for (const row of rows) {
         const existing = storeRows.find(r => r.id === row.id);
         if (existing) {
-          await updateRowInStore(row.id, { date: row.date, status: row.status, rubric: row.rubric, platforms: row.platforms, text_content: row.text });
+          await updateRowInStore(row.id, { date: row.date, status: row.status, rubric: row.rubric, platforms: row.platforms, text_content: row.text, attachments: Array.isArray(row.attachments) ? row.attachments : [], sort_order: rows.indexOf(row) });
         } else {
-          await addRowInStore({ id: row.id, date: row.date, status: row.status, rubric: row.rubric, platforms: row.platforms, text_content: row.text, sort_order: rows.indexOf(row) });
+          await addRowInStore({ id: row.id, date: row.date, status: row.status, rubric: row.rubric, platforms: row.platforms, text_content: row.text, attachments: Array.isArray(row.attachments) ? row.attachments : [], sort_order: rows.indexOf(row) });
         }
       }
       setHasChanges(false);
@@ -180,6 +182,16 @@ function SingleMediaTable({ tabPrefix }: { tabPrefix: string }) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleAttachmentUpload = async (rowId: string, file: File) => {
+    const uploaded = await uploadFileToStorage(tabPrefix, file);
+    setRows(currentRows => currentRows.map(row => {
+      if (row.id !== rowId) return row;
+      const existing = Array.isArray(row.attachments) ? row.attachments : [];
+      return { ...row, attachments: [...existing, uploaded] };
+    }));
+    setHasChanges(true);
   };
 
   // Сохраняем позицию курсора перед открытием модалки
@@ -275,7 +287,7 @@ function SingleMediaTable({ tabPrefix }: { tabPrefix: string }) {
             <tbody>
               <SortableContext items={rows.map(r => r.id)} strategy={verticalListSortingStrategy}>
                 {rows.map((row, index) => (
-                  <SortableTableRow key={row.id} row={row} index={index} colWidths={colWidths} onUpdate={updateCell} onInsert={insertRow} onEditClick={openTextEdit} />
+                  <SortableTableRow key={row.id} row={row} index={index} colWidths={colWidths} onUpdate={updateCell} onInsert={insertRow} onEditClick={openTextEdit} onAttachmentUpload={handleAttachmentUpload} />
                 ))}
               </SortableContext>
             </tbody>

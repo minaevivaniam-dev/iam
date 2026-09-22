@@ -27,7 +27,7 @@ export function CreateTaskPage() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!title || !deadline) return;
 
     const newTask: ProjectTask = {
@@ -50,7 +50,8 @@ export function CreateTaskPage() {
       updatedAt: new Date().toISOString(),
     };
 
-    addTask(newTask);
+    const saved = await addTask(newTask);
+    if (!saved) return;
     
     // Сброс формы
     setTitle('');

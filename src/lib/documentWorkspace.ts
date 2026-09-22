@@ -316,6 +316,33 @@ export function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
+export async function uploadFileToStorage(taskId: string, file: File): Promise<UploadedDocument> {
+  const timestamp = Date.now();
+  const storagePath = `${taskId}/${timestamp}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+  const document: UploadedDocument = {
+    id: `${timestamp}-${Math.random().toString(16).slice(2)}`,
+    name: file.name,
+    type: file.type || 'application/octet-stream',
+    size: file.size,
+    createdAt: new Date().toISOString(),
+    storagePath,
+    url: '',
+  };
+
+  try {
+    const { error } = await supabase.storage.from('documents').upload(storagePath, file, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: file.type || 'application/octet-stream',
+    });
+    if (error) throw error;
+    const { data } = supabase.storage.from('documents').getPublicUrl(storagePath);
+    return { ...document, url: data.publicUrl };
+  } catch {
+    return { ...document, dataUrl: await fileToDataUrl(file) };
+  }
+}
+
 export function downloadTextFile(filename: string, content: string) {
   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
   const url = URL.createObjectURL(blob);

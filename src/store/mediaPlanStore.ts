@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { formatSupabaseNetworkError, supabase, supabaseConfigError } from '../lib/supabase';
+import type { UploadedDocument } from '../lib/documentWorkspace';
 
 export interface MediaRow {
   id: string;
@@ -9,6 +10,7 @@ export interface MediaRow {
   platforms: string[];
   text_content: string;
   sort_order: number;
+  attachments?: UploadedDocument[];
 }
 
 interface MediaPlanState {
@@ -32,6 +34,7 @@ function rowFromDb(row: any): MediaRow {
     platforms: row.platforms || [],
     text_content: row.text_content || '',
     sort_order: row.sort_order || 0,
+    attachments: Array.isArray(row.attachments) ? row.attachments : [],
   };
 }
 
