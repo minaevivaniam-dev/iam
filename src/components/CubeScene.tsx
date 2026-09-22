@@ -1,23 +1,22 @@
-import { useRef } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, RoundedBox, Text } from '@react-three/drei';
+import { useEffect, useRef } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { OrbitControls, Text } from '@react-three/drei';
 import * as THREE from 'three';
 
 type GanttTask = {
   title: string;
   startDay: number;
   duration: number;
-  color: string;
 };
 
 const PREPARATION_TASKS: GanttTask[] = [
-  { title: 'Аудит каналов', startDay: 1, duration: 6, color: '#38bdf8' },
-  { title: 'Рубрикатор', startDay: 0, duration: 7, color: '#a78bfa' },
-  { title: 'Tone of voice', startDay: 3, duration: 4, color: '#f472b6' },
-  { title: 'Визуальные шаблоны', startDay: 7, duration: 5, color: '#34d399' },
-  { title: 'Концепция каналов', startDay: 8, duration: 3, color: '#fbbf24' },
-  { title: 'Графические материалы', startDay: 10, duration: 7, color: '#fb7185' },
-  { title: 'Страницы сообществ', startDay: 24, duration: 1, color: '#60a5fa' },
+  { title: 'Аудит каналов', startDay: 1, duration: 6 },
+  { title: 'Рубрикатор', startDay: 0, duration: 7 },
+  { title: 'Tone of voice', startDay: 3, duration: 4 },
+  { title: 'Визуальные шаблоны', startDay: 7, duration: 5 },
+  { title: 'Концепция каналов', startDay: 8, duration: 3 },
+  { title: 'Графические материалы', startDay: 10, duration: 7 },
+  { title: 'Страницы сообществ', startDay: 24, duration: 1 },
 ];
 
 function AxisLine({ start, end }: { start: [number, number, number]; end: [number, number, number] }) {
@@ -40,7 +39,7 @@ function CoordinateSystem({ axisLength }: { axisLength: number }) {
       <Text position={[axisLength + 1, 0, 0]} fontSize={0.55} color="#cbd5e1">Время, дни (X)</Text>
       <Text position={[0, 3.5, 0]} fontSize={0.55} color="#cbd5e1">Бюджет (Y)</Text>
       <Text position={[0, 0, -3.6]} fontSize={0.55} color="#cbd5e1" rotation={[0, Math.PI / 2, 0]}>Качество (Z)</Text>
-      <gridHelper args={[axisLength + 2, axisLength + 2, '#334155', '#1e293b']} position={[(axisLength - 1) / 2, 0, 0]} />
+      <gridHelper args={[axisLength, axisLength, '#334155', '#1e293b']} position={[(axisLength - 1) / 2, 0, 0]} />
       {Array.from({ length: axisLength + 1 }, (_, day) => (
         <Text key={day} position={[day, -0.45, 0]} fontSize={0.28} color="#94a3b8">{day}</Text>
       ))}
@@ -50,21 +49,38 @@ function CoordinateSystem({ axisLength }: { axisLength: number }) {
 }
 
 function GanttCube({ task }: { task: GanttTask }) {
-  const meshRef = useRef<THREE.Mesh>(null);
+  const lineRef = useRef<THREE.LineSegments>(null);
   const size: [number, number, number] = [task.duration, 1, 1];
   const position: [number, number, number] = [task.startDay + task.duration / 2, 0.5, -0.5];
 
-  useFrame((state) => {
-    if (meshRef.current) meshRef.current.position.y = position[1] + Math.sin(state.clock.getElapsedTime() * 0.8 + task.startDay) * 0.035;
-  });
+  useEffect(() => {
+    lineRef.current?.computeLineDistances();
+  }, []);
+
+  const [width, height, depth] = size;
+  const x = width / 2;
+  const y = height / 2;
+  const z = depth / 2;
+  const edgePoints = [
+    -x, -y, -z, x, -y, -z, x, -y, -z, x, y, -z, x, y, -z, -x, y, -z, -x, y, -z, -x, -y, -z,
+    -x, -y, z, x, -y, z, x, -y, z, x, y, z, x, y, z, -x, y, z, -x, y, z, -x, -y, z,
+    -x, -y, -z, -x, -y, z, x, -y, -z, x, -y, z, x, y, -z, x, y, z, -x, y, -z, -x, y, z,
+  ];
 
   return (
     <group position={position}>
-      <RoundedBox ref={meshRef} args={size} radius={0.12} smoothness={4}>
-        <meshStandardMaterial color={task.color} emissive={task.color} emissiveIntensity={0.3} roughness={0.35} metalness={0.1} transparent opacity={0.88} />
-      </RoundedBox>
-      <Text position={[0, 1, -0.05]} fontSize={0.34} color="#f8fafc" anchorX="center" anchorY="middle" maxWidth={Math.max(1.2, task.duration - 0.2)}>{task.title}</Text>
-      <Text position={[0, -0.72, 0]} fontSize={0.26} color="#cbd5e1" anchorX="center">{task.duration} дн.</Text>
+      <mesh>
+        <boxGeometry args={size} />
+        <meshBasicMaterial color="#22c55e" transparent opacity={0.035} depthWrite={false} />
+      </mesh>
+      <lineSegments ref={lineRef}>
+        <bufferGeometry>
+          <float32BufferAttribute attach="attributes-position" args={[new Float32Array(edgePoints), 3]} itemSize={3} />
+        </bufferGeometry>
+        <lineDashedMaterial color="#4ade80" transparent opacity={0.85} dashSize={0.18} gapSize={0.12} linewidth={1} />
+      </lineSegments>
+      <Text position={[0, 0.72, -0.52]} fontSize={0.3} color="#86efac" anchorX="center" anchorY="middle" maxWidth={Math.max(1.2, task.duration - 0.2)}>{task.title}</Text>
+      <Text position={[0, -0.72, 0]} fontSize={0.25} color="#86efac" anchorX="center">{task.duration} дн.</Text>
     </group>
   );
 }
