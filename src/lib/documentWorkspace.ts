@@ -28,7 +28,7 @@ export type StoredDocument = {
   uploads: UploadedDocument[];
   description?: string;
   assignee?: string;
-  metrics?: { time: number; quality: number; cost: number };
+  metrics?: { startDate: string; endDate: string; quality: number; cost: number };
 };
 
 const getStorageKey = (taskId: string) => `fc-bas-document:${taskId}`;

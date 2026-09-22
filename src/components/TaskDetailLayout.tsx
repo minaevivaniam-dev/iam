@@ -24,6 +24,8 @@ export interface TaskConfig {
   assignee: string;
   description: string;
   metrics: { progress: number; time: number; quality: number; cost: number };
+  startDate?: string;
+  endDate?: string;
   columns?: ColumnConfig[];
   initialRows?: TaskRow[];
   kpiTarget?: number;
@@ -32,13 +34,14 @@ export interface TaskConfig {
   notesDefault?: string;
 }
 
-type TaskMetrics = { time: number; quality: number; cost: number };
+type TaskMetrics = { startDate: string; endDate: string; quality: number; cost: number };
 
-function normalizeMetrics(metrics: TaskConfig['metrics']): TaskMetrics {
+function normalizeMetrics(config: TaskConfig): TaskMetrics {
   return {
-    time: Math.max(1, Math.round(metrics.time / 10) || 1),
-    quality: Math.max(1, Math.round(metrics.quality / 10) || 1),
-    cost: Math.max(1, Math.round(metrics.cost / 10) || 1),
+    startDate: config.startDate ?? '2026-09-14',
+    endDate: config.endDate ?? '2026-09-22',
+    quality: 10,
+    cost: 10,
   };
 }
 
@@ -58,13 +61,14 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
   const [descriptionText, setDescriptionText] = useState(config.description);
   const [notesText, setNotesText] = useState(config.notesDefault ?? config.description);
   const [selectedAssignee, setSelectedAssignee] = useState(config.assignee);
-  const [editableMetrics, setEditableMetrics] = useState<TaskMetrics>(() => normalizeMetrics(config.metrics));
+  const [editableMetrics, setEditableMetrics] = useState<TaskMetrics>(() => normalizeMetrics(config));
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [uploads, setUploads] = useState<UploadedDocument[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const autosaveTimer = useRef<number | null>(null);
   const notesDirtyRef = useRef(false);
   const descriptionDirtyRef = useRef(false);
+  const metricsDirtyRef = useRef(false);
   const metricsHydratedRef = useRef(false);
   const metricsSaveTimer = useRef<number | null>(null);
   const tableSaveRef = useRef<(() => Promise<boolean>) | null>(null);
@@ -87,7 +91,7 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
       setNotesText(doc.content || config.notesDefault || config.description);
       setDescriptionText(doc.description ?? config.description);
       setSelectedAssignee(doc.assignee ?? config.assignee);
-      setEditableMetrics(doc.metrics ?? normalizeMetrics(config.metrics));
+      setEditableMetrics(doc.metrics ?? normalizeMetrics(config));
       notesDirtyRef.current = false;
       descriptionDirtyRef.current = false;
       metricsHydratedRef.current = true;
@@ -109,7 +113,7 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
       if (!descriptionDirtyRef.current && doc.assignee !== selectedAssignee) {
         setSelectedAssignee(doc.assignee ?? config.assignee);
       }
-      if (metricsHydratedRef.current && doc.metrics) {
+      if (metricsHydratedRef.current && !metricsDirtyRef.current && doc.metrics) {
         setEditableMetrics(doc.metrics);
       }
     });
@@ -128,6 +132,7 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
       const next = { ...current, title: config.title, taskId: taskPrefix, description: descriptionText, assignee: selectedAssignee, metrics: editableMetrics, updatedAt: new Date().toISOString() };
       writeDocument(taskPrefix, next);
       await persistDocument(taskPrefix, next);
+      metricsDirtyRef.current = false;
     }, 600);
     return () => { if (metricsSaveTimer.current) window.clearTimeout(metricsSaveTimer.current); };
   }, [config.title, descriptionText, editableMetrics, selectedAssignee, taskPrefix]);
@@ -406,16 +411,21 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
             <div className="flex-1 flex gap-3 min-h-0">
               <div className="flex-1 bg-white border border-slate-200 rounded-lg p-4 flex flex-col gap-2.5 justify-center">
                 {[
-                  { key: 'time' as const, label: 'Время', color: 'accent-blue-600' },
-                  { key: 'quality' as const, label: 'Качество', color: 'accent-emerald-600' },
-                  { key: 'cost' as const, label: 'Деньги', color: 'accent-amber-500' },
+                  { key: 'quality' as const, label: 'Качество' },
+                  { key: 'cost' as const, label: 'Деньги' },
                 ].map((m) => (
                   <div key={m.label} className="flex items-center gap-3">
                     <span className="text-xs text-slate-500 w-20 shrink-0">{m.label}</span>
-                    <input type="range" min="1" max="10" step="1" value={editableMetrics[m.key]} onChange={(e) => setEditableMetrics((current) => ({ ...current, [m.key]: Number(e.target.value) }))} className={`flex-1 ${m.color}`} />
-                    <span className="text-xs font-semibold text-slate-600 w-8 text-right">{editableMetrics[m.key]}</span>
+                    <input type="number" min="1" max="10" step="1" value={editableMetrics[m.key]} onChange={(e) => { metricsDirtyRef.current = true; setEditableMetrics((current) => ({ ...current, [m.key]: Math.min(10, Math.max(1, Number(e.target.value) || 1)) })); }} className="w-20 border border-slate-200 rounded px-2 py-1 text-sm outline-none focus:border-blue-500" />
+                    <span className="text-xs text-slate-400">из 10</span>
                   </div>
                 ))}
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-slate-500 w-20 shrink-0">Период</span>
+                  <input type="date" value={editableMetrics.startDate} onChange={(e) => { metricsDirtyRef.current = true; setEditableMetrics((current) => ({ ...current, startDate: e.target.value })); }} className="min-w-0 flex-1 border border-slate-200 rounded px-2 py-1 text-xs outline-none focus:border-blue-500" />
+                  <span className="text-xs text-slate-400">до</span>
+                  <input type="date" value={editableMetrics.endDate} min={editableMetrics.startDate} onChange={(e) => { metricsDirtyRef.current = true; setEditableMetrics((current) => ({ ...current, endDate: e.target.value })); }} className="min-w-0 flex-1 border border-slate-200 rounded px-2 py-1 text-xs outline-none focus:border-blue-500" />
+                </div>
               </div>
               <div className="w-40 bg-white border border-slate-200 rounded-lg p-4 flex items-center justify-center shrink-0">
                 <select className="text-xs text-slate-500 bg-transparent outline-none cursor-pointer border border-slate-200 rounded px-2 py-1 hover:border-blue-400 transition-colors">
