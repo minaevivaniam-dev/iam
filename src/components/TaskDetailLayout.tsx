@@ -314,7 +314,7 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
             saveState === 'saved' ? 'bg-emerald-600' : saveState === 'error' ? 'bg-red-600' : saveState === 'saving' ? 'bg-blue-400 cursor-wait' : 'bg-blue-600 hover:bg-blue-700'
           }`}
         >
-          <Save size={16} />{saveState === 'saving' ? 'Сохранение...' : saveState === 'saved' ? 'Сохранено' : saveState === 'error' ? 'Ошибка сохранения' : 'Сохранить'}
+          <Save size={16} />{saveState === 'saving' ? 'Сохранение...' : saveState === 'saved' ? 'Сохранено в базе' : saveState === 'error' ? 'Локально сохранено' : 'Сохранить'}
         </button>
       </div>
 

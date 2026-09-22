@@ -125,9 +125,17 @@ export function appendActivity(taskId: string, action: string, detail: string) {
 }
 
 export async function persistDocument(taskId: string, record: StoredDocument): Promise<boolean> {
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) {
+    writeDocument(taskId, record);
+    console.error('[Documents] Нет авторизованного пользователя');
+    return false;
+  }
+
   const remoteRow = {
     id: taskId,
     task_id: taskId,
+    owner_id: userData.user.id,
     title: record.title,
     content: record.content,
     uploads: record.uploads,
@@ -145,16 +153,19 @@ export async function persistDocument(taskId: string, record: StoredDocument): P
     }
     if (error && isSupabaseTableMissing(error)) {
       writeDocument(taskId, record);
+      console.error('[Documents] Таблица или поле не найдены:', error.message);
       return false;
     }
     if (error) {
       writeDocument(taskId, record);
+      console.error('[Documents] Supabase отклонил сохранение:', error.message, error.details ?? '');
       return false;
     }
     writeDocument(taskId, record);
     return true;
-  } catch {
+  } catch (error) {
     writeDocument(taskId, record);
+    console.error('[Documents] Ошибка сохранения:', error);
     return false;
   }
 }
@@ -168,9 +179,11 @@ export async function persistActivity(taskId: string, action: string, detail: st
   };
 
   try {
+    const { data: userData } = await supabase.auth.getUser();
     const { error } = await supabase.from('document_activity').insert({
       id: entry.id,
       task_id: taskId,
+      owner_id: userData.user?.id,
       action: entry.action,
       detail: entry.detail,
       created_at: entry.createdAt,
@@ -187,8 +200,9 @@ export async function persistActivity(taskId: string, action: string, detail: st
 
     appendActivity(taskId, action, detail);
     return true;
-  } catch {
+  } catch (error) {
     appendActivity(taskId, action, detail);
+    console.error('[Activity] Ошибка сохранения:', error);
     return false;
   }
 }
