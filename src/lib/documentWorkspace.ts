@@ -138,7 +138,11 @@ export async function persistDocument(taskId: string, record: StoredDocument): P
   };
 
   try {
-    const { error } = await supabase.from('documents').upsert(remoteRow, { onConflict: 'id' });
+    let { error } = await supabase.from('documents').upsert(remoteRow, { onConflict: 'id' });
+    if (error && /description|assignee|column/i.test(error.message ?? '')) {
+      const { description: _description, assignee: _assignee, ...legacyRow } = remoteRow;
+      ({ error } = await supabase.from('documents').upsert(legacyRow, { onConflict: 'id' }));
+    }
     if (error && isSupabaseTableMissing(error)) {
       writeDocument(taskId, record);
       return false;
@@ -204,7 +208,7 @@ export async function loadRemoteDocument(taskId: string, fallbackTitle: string):
       return readDocument(taskId, fallbackTitle);
     }
 
-    return {
+    const remoteDocument: StoredDocument = {
       id: data.id,
       taskId: data.task_id ?? taskId,
       title: data.title ?? fallbackTitle,
@@ -215,6 +219,15 @@ export async function loadRemoteDocument(taskId: string, fallbackTitle: string):
       description: data.description ?? undefined,
       assignee: data.assignee ?? undefined,
     };
+
+    if (typeof window !== 'undefined' && window.localStorage.getItem(getStorageKey(taskId))) {
+      const localDocument = readDocument(taskId, fallbackTitle);
+      if (new Date(localDocument.updatedAt).getTime() > new Date(remoteDocument.updatedAt).getTime()) {
+        return localDocument;
+      }
+    }
+
+    return remoteDocument;
   } catch {
     return readDocument(taskId, fallbackTitle);
   }

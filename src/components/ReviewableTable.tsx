@@ -527,13 +527,17 @@ export function ReviewableTable({
 
   const insertRow = (afterId: string) => {
     if (reviewMode) return;
-    const idx = rows.findIndex(r => r.id === afterId);
     const newRow: TaskRow = { id: `${taskPrefix}-row-${Date.now()}` };
     columns.forEach(c => { newRow[c.key] = c.type === 'status' ? 'запланирован' : c.type === 'platforms' ? [] : c.type === 'attachments' ? 3 : ''; });
-    const n = [...rows]; n.splice(idx + 1, 0, newRow); setRows(n);
+    setRows((currentRows) => {
+      const n = [...currentRows];
+      const currentIndex = n.findIndex(r => r.id === afterId);
+      n.splice(currentIndex + 1, 0, newRow);
+      return n;
+    });
   };
   const updateCell = (id: string, field: string, value: any) => {
-    setRows(rows.map(r => r.id === id ? { ...r, [field]: value } : r));
+    setRows((currentRows) => currentRows.map(r => r.id === id ? { ...r, [field]: value } : r));
   };
   const onStatusChange = (id: string, status: Status) => updateCell(id, 'status', status);
   const togglePlatform = (rowId: string, platformId: string) => {
