@@ -13,17 +13,18 @@ alter table public.profiles enable row level security;
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
-security definer set search_path = public
+security definer set search_path = public, auth, extensions
 as $$
 declare
-  requested_role text := new.raw_user_meta_data->>'role';
+  requested_role text := lower(coalesce(new.raw_user_meta_data->>'role', 'client'));
+  profile_email text := coalesce(nullif(trim(new.email), ''), new.id::text || '@fc-bas.local');
 begin
   if requested_role not in ('manager', 'copywriter', 'designer', 'client') then
     requested_role := 'client';
   end if;
 
   insert into public.profiles (id, email, role)
-  values (new.id, coalesce(new.email, ''), requested_role)
+  values (new.id, profile_email, requested_role)
   on conflict (id) do update set email = excluded.email;
   return new;
 end;
@@ -88,6 +89,7 @@ begin
 
   if to_regclass('public.profiles') is not null then
     create policy profiles_select_own on public.profiles for select to authenticated using (id = auth.uid());
+    create policy profiles_insert_own on public.profiles for insert to authenticated with check (id = auth.uid());
     create policy profiles_update_own on public.profiles for update to authenticated using (id = auth.uid()) with check (id = auth.uid());
   end if;
 
