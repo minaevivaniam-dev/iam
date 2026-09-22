@@ -17,6 +17,12 @@ alter table if exists public.tasks alter column owner_id set default auth.uid();
 alter table if exists public.executors alter column owner_id set default auth.uid();
 alter table if exists public.media_plan_rows alter column owner_id set default auth.uid();
 
+alter table if exists public.documents enable row level security;
+alter table if exists public.document_activity enable row level security;
+alter table if exists public.tasks enable row level security;
+alter table if exists public.executors enable row level security;
+alter table if exists public.media_plan_rows enable row level security;
+
 -- Remove the previous anonymous/open policies before adding owner-scoped policies.
 do $$
 declare
