@@ -137,13 +137,16 @@ export function CubeScene({ onOpenTask }: { onOpenTask: (taskId: string) => void
   }, []);
 
   const resolvedMetrics = PREPARATION_TASKS.map((task) => taskMetrics[task.taskId] ?? task.defaultMetrics);
+  const qualitySizes = resolvedMetrics.map((metrics) => Math.max(1, metrics.quality / 10));
+  const qualityLength = axisLength;
   const qualityOffsets: number[] = [];
-  let qualityCursor = 0;
-  resolvedMetrics.forEach((metrics) => {
+  let qualityCursor = qualityLength - qualitySizes[0];
+  qualitySizes.forEach((size, index) => {
+    if (index > 0) {
+      qualityCursor -= 1 + size;
+    }
     qualityOffsets.push(qualityCursor);
-    qualityCursor += Math.max(1, metrics.quality / 10) + 1;
   });
-  const qualityLength = qualityCursor;
 
   return (
     <div style={{ width: '100%', height: '100%', minHeight: '500px', background: '#0f172a', borderRadius: '12px', position: 'relative' }}>
