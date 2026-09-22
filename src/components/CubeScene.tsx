@@ -6,6 +6,7 @@ import { loadRemoteDocument, subscribeToTask } from '../lib/documentWorkspace';
 
 type GanttTask = {
   title: string;
+  description: string;
   startDay: number;
   duration: number;
   startDate: string;
@@ -15,13 +16,13 @@ type GanttTask = {
 };
 
 const PREPARATION_TASKS: GanttTask[] = [
-  { title: 'Аудит каналов', startDay: 1, duration: 6, startDate: '15.09.2026', endDate: '22.09.2026', taskId: 'audit-channels', defaultMetrics: { startDate: '2026-09-15', endDate: '2026-09-22', quality: 10, cost: 10 } },
-  { title: 'Рубрикатор', startDay: 0, duration: 7, startDate: '14.09.2026', endDate: '22.09.2026', taskId: 'rubricator-update', defaultMetrics: { startDate: '2026-09-14', endDate: '2026-09-22', quality: 10, cost: 10 } },
-  { title: 'Tone of voice', startDay: 3, duration: 4, startDate: '17.09.2026', endDate: '22.09.2026', taskId: 'tone-of-voice', defaultMetrics: { startDate: '2026-09-17', endDate: '2026-09-22', quality: 10, cost: 10 } },
-  { title: 'Визуальные шаблоны', startDay: 7, duration: 5, startDate: '21.09.2026', endDate: '25.09.2026', taskId: 'visual-template-kit', defaultMetrics: { startDate: '2026-09-21', endDate: '2026-09-25', quality: 10, cost: 10 } },
-  { title: 'Концепция каналов', startDay: 8, duration: 3, startDate: '22.09.2026', endDate: '24.09.2026', taskId: 'channel-concept', defaultMetrics: { startDate: '2026-09-22', endDate: '2026-09-24', quality: 10, cost: 10 } },
-  { title: 'Графические материалы', startDay: 10, duration: 7, startDate: '24.09.2026', endDate: '02.10.2026', taskId: 'graphic-materials', defaultMetrics: { startDate: '2026-09-24', endDate: '2026-10-02', quality: 10, cost: 10 } },
-  { title: 'Страницы сообществ', startDay: 24, duration: 1, startDate: '08.10.2026', endDate: '08.10.2026', taskId: 'community-pages', defaultMetrics: { startDate: '2026-10-08', endDate: '2026-10-08', quality: 10, cost: 10 } },
+  { title: 'Аудит каналов', description: 'Оценка текущей структуры контента, форматов, периодичности и показателей вовлечённости.', startDay: 1, duration: 6, startDate: '15.09.2026', endDate: '22.09.2026', taskId: 'audit-channels', defaultMetrics: { startDate: '2026-09-15', endDate: '2026-09-22', quality: 10, cost: 10 } },
+  { title: 'Рубрикатор', description: 'Перечень постоянных тематических рубрик с назначением, каналом, аудиторией и форматом.', startDay: 0, duration: 7, startDate: '14.09.2026', endDate: '22.09.2026', taskId: 'rubricator-update', defaultMetrics: { startDate: '2026-09-14', endDate: '2026-09-22', quality: 10, cost: 10 } },
+  { title: 'Tone of voice', description: 'Принципы обращения к аудитории, недопустимая лексика и правила подачи экспертной информации.', startDay: 3, duration: 4, startDate: '17.09.2026', endDate: '22.09.2026', taskId: 'tone-of-voice', defaultMetrics: { startDate: '2026-09-17', endDate: '2026-09-22', quality: 10, cost: 10 } },
+  { title: 'Визуальные шаблоны', description: 'Не менее пяти шаблонов: обложка, карточка, инфографика, титульный кадр и цитата эксперта.', startDay: 7, duration: 5, startDate: '21.09.2026', endDate: '25.09.2026', taskId: 'visual-template-kit', defaultMetrics: { startDate: '2026-09-21', endDate: '2026-09-25', quality: 10, cost: 10 } },
+  { title: 'Концепция каналов', description: 'Утверждение названий, рубрикатора и общей концепции новых каналов.', startDay: 8, duration: 3, startDate: '22.09.2026', endDate: '24.09.2026', taskId: 'channel-concept', defaultMetrics: { startDate: '2026-09-22', endDate: '2026-09-24', quality: 10, cost: 10 } },
+  { title: 'Графические материалы', description: 'Подготовка аватара, обложки и системы брендинга публикаций.', startDay: 10, duration: 7, startDate: '24.09.2026', endDate: '02.10.2026', taskId: 'graphic-materials', defaultMetrics: { startDate: '2026-09-24', endDate: '2026-10-02', quality: 10, cost: 10 } },
+  { title: 'Страницы сообществ', description: 'Создание и первичная настройка страниц сообществ для выбранных каналов.', startDay: 24, duration: 1, startDate: '08.10.2026', endDate: '08.10.2026', taskId: 'community-pages', defaultMetrics: { startDate: '2026-10-08', endDate: '2026-10-08', quality: 10, cost: 10 } },
 ];
 
 const timelineStart = new Date(Date.UTC(2026, 8, 14));
@@ -46,13 +47,13 @@ function AxisLine({ start, end }: { start: [number, number, number]; end: [numbe
 function CoordinateSystem({ axisLength, qualityLength }: { axisLength: number; qualityLength: number }) {
   return (
     <group>
-      <AxisLine start={[-1, 0, 0]} end={[axisLength, 0, 0]} />
+      <AxisLine start={[0, 0, 0]} end={[axisLength, 0, 0]} />
       <AxisLine start={[0, 0, 0]} end={[0, 3, 0]} />
-      <AxisLine start={[0, 0, 0]} end={[0, 0, -qualityLength]} />
+      <AxisLine start={[0, 0, 0]} end={[0, 0, qualityLength]} />
       <Text position={[axisLength + 1, 0, 0]} fontSize={0.55} color="#cbd5e1">Время, дни (X)</Text>
       <Text position={[0, 3.5, 0]} fontSize={0.55} color="#cbd5e1">Бюджет (Y)</Text>
-      <Text position={[0, 0, -qualityLength - 0.7]} fontSize={0.55} color="#cbd5e1" rotation={[0, Math.PI / 2, 0]}>Качество (Z)</Text>
-      <gridHelper args={[axisLength, axisLength, '#334155', '#1e293b']} position={[(axisLength - 1) / 2, 0, 0]} />
+      <Text position={[0, 0, qualityLength + 0.7]} fontSize={0.55} color="#cbd5e1" rotation={[0, Math.PI / 2, 0]}>Качество (Z)</Text>
+      <gridHelper args={[axisLength, axisLength, '#334155', '#1e293b']} position={[axisLength / 2, 0, qualityLength / 2]} />
       {Array.from({ length: axisLength + 1 }, (_, day) => (
         day % 2 === 0 ? <Text key={day} position={[day, -0.45, 0]} fontSize={0.27} color="#94a3b8">{formatDate(day)}</Text> : null
       ))}
@@ -69,7 +70,9 @@ function GanttCube({ task, metrics, qualityOffset, onOpenTask }: { task: GanttTa
   const duration = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
   const startDay = Math.max(0, Math.round((start.getTime() - timelineStart.getTime()) / 86400000));
   const size: [number, number, number] = [duration, metrics.cost / 10, metrics.quality / 10];
-  const position: [number, number, number] = [startDay + duration / 2, (metrics.cost / 10) / 2, -(qualityOffset + (metrics.quality / 10) / 2)];
+  const position: [number, number, number] = [startDay + duration / 2, (metrics.cost / 10) / 2, qualityOffset + (metrics.quality / 10) / 2];
+  const passedUntil = new Date('2026-09-24T00:00:00Z');
+  const passedDuration = Math.max(0, Math.min(duration, Math.ceil((passedUntil.getTime() - start.getTime()) / 86400000)));
 
   useEffect(() => {
     lineRef.current?.computeLineDistances();
@@ -86,24 +89,33 @@ function GanttCube({ task, metrics, qualityOffset, onOpenTask }: { task: GanttTa
   ];
 
   return (
-    <group position={position} onPointerOver={(event) => { event.stopPropagation(); setIsHovered(true); }} onPointerOut={() => setIsHovered(false)} onClick={(event) => { event.stopPropagation(); onOpenTask(task.taskId); }}>
+    <group position={position}>
       <mesh>
         <boxGeometry args={size} />
         <meshBasicMaterial color="#22c55e" transparent opacity={0.035} depthWrite={false} />
       </mesh>
+      {passedDuration > 0 && <mesh position={[-width / 2 + passedDuration / 2, 0, 0]}>
+        <boxGeometry args={[passedDuration, height, depth]} />
+        <meshBasicMaterial color="#4ade80" transparent opacity={0.22} depthWrite={false} />
+      </mesh>}
       <lineSegments ref={lineRef}>
         <bufferGeometry>
           <float32BufferAttribute attach="attributes-position" args={[new Float32Array(edgePoints), 3]} itemSize={3} />
         </bufferGeometry>
         <lineDashedMaterial color="#4ade80" transparent opacity={0.85} dashSize={0.18} gapSize={0.12} linewidth={1} />
       </lineSegments>
+      <mesh onPointerEnter={(event) => { event.stopPropagation(); setIsHovered(true); }} onPointerLeave={(event) => { event.stopPropagation(); setIsHovered(false); }} onClick={(event) => { event.stopPropagation(); onOpenTask(task.taskId); }}>
+        <boxGeometry args={size} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
       <Text position={[0, 0.72, -0.52]} fontSize={0.3} color="#86efac" anchorX="center" anchorY="middle" maxWidth={Math.max(1.2, task.duration - 0.2)}>{task.title}</Text>
       <Text position={[0, -0.72, 0]} fontSize={0.25} color="#86efac" anchorX="center">{metrics.startDate} - {metrics.endDate}</Text>
       {isHovered && (
         <Html distanceFactor={8} position={[0, 1.3, 0]} center>
-          <div className="pointer-events-none w-56 rounded-lg border border-emerald-400/60 bg-slate-950/95 p-3 text-left text-xs text-slate-200 shadow-xl">
+          <div className="pointer-events-none w-80 rounded-xl border border-emerald-400/70 bg-slate-950/95 p-4 text-left text-sm text-slate-200 shadow-2xl">
             <p className="font-semibold text-emerald-300">{task.title}</p>
             <p className="mt-1">Срок: {task.startDate} - {task.endDate}</p>
+            <p className="mt-2 leading-5 text-slate-300">{task.description}</p>
             <p>Время: {metrics.startDate} - {metrics.endDate}</p>
             <p>Деньги: {metrics.cost} · Качество: {metrics.quality}</p>
             <p>Качество: {metrics.quality}</p>
