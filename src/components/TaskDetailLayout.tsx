@@ -32,6 +32,16 @@ export interface TaskConfig {
   notesDefault?: string;
 }
 
+type TaskMetrics = { time: number; quality: number; cost: number };
+
+function normalizeMetrics(metrics: TaskConfig['metrics']): TaskMetrics {
+  return {
+    time: Math.max(1, Math.round(metrics.time / 10) || 1),
+    quality: Math.max(1, Math.round(metrics.quality / 10) || 1),
+    cost: Math.max(1, Math.round(metrics.cost / 10) || 1),
+  };
+}
+
 const ASSIGNEES = [
   { id: 'copywriter', name: 'Копирайтер' },
   { id: 'designer', name: 'Дизайнер' },
@@ -48,12 +58,15 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
   const [descriptionText, setDescriptionText] = useState(config.description);
   const [notesText, setNotesText] = useState(config.notesDefault ?? config.description);
   const [selectedAssignee, setSelectedAssignee] = useState(config.assignee);
+  const [editableMetrics, setEditableMetrics] = useState<TaskMetrics>(() => normalizeMetrics(config.metrics));
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [uploads, setUploads] = useState<UploadedDocument[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const autosaveTimer = useRef<number | null>(null);
   const notesDirtyRef = useRef(false);
   const descriptionDirtyRef = useRef(false);
+  const metricsHydratedRef = useRef(false);
+  const metricsSaveTimer = useRef<number | null>(null);
   const tableSaveRef = useRef<(() => Promise<boolean>) | null>(null);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
@@ -74,8 +87,10 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
       setNotesText(doc.content || config.notesDefault || config.description);
       setDescriptionText(doc.description ?? config.description);
       setSelectedAssignee(doc.assignee ?? config.assignee);
+      setEditableMetrics(doc.metrics ?? normalizeMetrics(config.metrics));
       notesDirtyRef.current = false;
       descriptionDirtyRef.current = false;
+      metricsHydratedRef.current = true;
     };
 
     void hydrate();
@@ -94,6 +109,9 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
       if (!descriptionDirtyRef.current && doc.assignee !== selectedAssignee) {
         setSelectedAssignee(doc.assignee ?? config.assignee);
       }
+      if (metricsHydratedRef.current && doc.metrics) {
+        setEditableMetrics(doc.metrics);
+      }
     });
 
     return () => {
@@ -101,6 +119,18 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
       unsubscribe();
     };
   }, [config.description, config.notesDefault, config.title, taskPrefix]);
+
+  useEffect(() => {
+    if (!metricsHydratedRef.current) return;
+    if (metricsSaveTimer.current) window.clearTimeout(metricsSaveTimer.current);
+    metricsSaveTimer.current = window.setTimeout(async () => {
+      const current = readDocument(taskPrefix, config.title);
+      const next = { ...current, title: config.title, taskId: taskPrefix, description: descriptionText, assignee: selectedAssignee, metrics: editableMetrics, updatedAt: new Date().toISOString() };
+      writeDocument(taskPrefix, next);
+      await persistDocument(taskPrefix, next);
+    }, 600);
+    return () => { if (metricsSaveTimer.current) window.clearTimeout(metricsSaveTimer.current); };
+  }, [config.title, descriptionText, editableMetrics, selectedAssignee, taskPrefix]);
 
   useEffect(() => {
     if (config.mode !== 'notes') return;
@@ -118,6 +148,7 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
         content: notesText,
         description: descriptionText,
         assignee: selectedAssignee,
+        metrics: editableMetrics,
         updatedAt: new Date().toISOString(),
         uploads,
       };
@@ -166,6 +197,7 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
           content: notesText,
           description: descriptionText,
           assignee: selectedAssignee,
+          metrics: editableMetrics,
           updatedAt: new Date().toISOString(),
           uploads,
         };
@@ -374,17 +406,14 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
             <div className="flex-1 flex gap-3 min-h-0">
               <div className="flex-1 bg-white border border-slate-200 rounded-lg p-4 flex flex-col gap-2.5 justify-center">
                 {[
-                  { label: 'Прогресс', value: config.metrics.progress, color: 'bg-blue-500' },
-                  { label: 'Время', value: config.metrics.time, color: 'bg-indigo-500' },
-                  { label: 'Качество', value: config.metrics.quality, color: 'bg-emerald-500' },
-                  { label: 'Деньги', value: config.metrics.cost, color: 'bg-amber-500' },
+                  { key: 'time' as const, label: 'Время', color: 'accent-blue-600' },
+                  { key: 'quality' as const, label: 'Качество', color: 'accent-emerald-600' },
+                  { key: 'cost' as const, label: 'Деньги', color: 'accent-amber-500' },
                 ].map((m) => (
                   <div key={m.label} className="flex items-center gap-3">
                     <span className="text-xs text-slate-500 w-20 shrink-0">{m.label}</span>
-                    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                      <div className={`h-full ${m.color} rounded-full transition-all`} style={{ width: `${m.value}%` }} />
-                    </div>
-                    <span className="text-xs text-slate-500 w-8 text-right">{m.value}%</span>
+                    <input type="range" min="1" max="10" step="1" value={editableMetrics[m.key]} onChange={(e) => setEditableMetrics((current) => ({ ...current, [m.key]: Number(e.target.value) }))} className={`flex-1 ${m.color}`} />
+                    <span className="text-xs font-semibold text-slate-600 w-8 text-right">{editableMetrics[m.key]}</span>
                   </div>
                 ))}
               </div>

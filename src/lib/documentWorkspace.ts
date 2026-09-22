@@ -28,6 +28,7 @@ export type StoredDocument = {
   uploads: UploadedDocument[];
   description?: string;
   assignee?: string;
+  metrics?: { time: number; quality: number; cost: number };
 };
 
 const getStorageKey = (taskId: string) => `fc-bas-document:${taskId}`;
@@ -67,6 +68,7 @@ export function readDocument(taskId: string, fallbackTitle: string): StoredDocum
       uploads: parsed.uploads ?? [],
       description: parsed.description,
       assignee: parsed.assignee,
+      metrics: parsed.metrics,
     };
   } catch {
     return emptyDocument(taskId, fallbackTitle);
@@ -141,6 +143,7 @@ export async function persistDocument(taskId: string, record: StoredDocument): P
     uploads: record.uploads,
     description: record.description ?? null,
     assignee: record.assignee ?? null,
+    metrics: record.metrics ?? null,
     created_at: record.createdAt,
     updated_at: record.updatedAt,
   };
@@ -232,6 +235,7 @@ export async function loadRemoteDocument(taskId: string, fallbackTitle: string):
       uploads: Array.isArray(data.uploads) ? data.uploads : [],
       description: data.description ?? undefined,
       assignee: data.assignee ?? undefined,
+      metrics: data.metrics ?? undefined,
     };
 
     if (typeof window !== 'undefined' && window.localStorage.getItem(getStorageKey(taskId))) {

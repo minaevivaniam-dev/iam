@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Html, OrbitControls, Text } from '@react-three/drei';
 import * as THREE from 'three';
+import { loadRemoteDocument, subscribeToTask } from '../lib/documentWorkspace';
 
 type GanttTask = {
   title: string;
@@ -10,16 +11,17 @@ type GanttTask = {
   startDate: string;
   endDate: string;
   taskId: string;
+  defaultMetrics: { time: number; quality: number; cost: number };
 };
 
 const PREPARATION_TASKS: GanttTask[] = [
-  { title: 'Аудит каналов', startDay: 1, duration: 6, startDate: '15.09.2026', endDate: '22.09.2026', taskId: 'audit-channels' },
-  { title: 'Рубрикатор', startDay: 0, duration: 7, startDate: '14.09.2026', endDate: '22.09.2026', taskId: 'rubricator-update' },
-  { title: 'Tone of voice', startDay: 3, duration: 4, startDate: '17.09.2026', endDate: '22.09.2026', taskId: 'tone-of-voice' },
-  { title: 'Визуальные шаблоны', startDay: 7, duration: 5, startDate: '21.09.2026', endDate: '25.09.2026', taskId: 'visual-template-kit' },
-  { title: 'Концепция каналов', startDay: 8, duration: 3, startDate: '22.09.2026', endDate: '24.09.2026', taskId: 'channel-concept' },
-  { title: 'Графические материалы', startDay: 10, duration: 7, startDate: '24.09.2026', endDate: '02.10.2026', taskId: 'graphic-materials' },
-  { title: 'Страницы сообществ', startDay: 24, duration: 1, startDate: '08.10.2026', endDate: '08.10.2026', taskId: 'community-pages' },
+  { title: 'Аудит каналов', startDay: 1, duration: 6, startDate: '15.09.2026', endDate: '22.09.2026', taskId: 'audit-channels', defaultMetrics: { time: 6, quality: 1, cost: 1 } },
+  { title: 'Рубрикатор', startDay: 0, duration: 7, startDate: '14.09.2026', endDate: '22.09.2026', taskId: 'rubricator-update', defaultMetrics: { time: 7, quality: 1, cost: 1 } },
+  { title: 'Tone of voice', startDay: 3, duration: 4, startDate: '17.09.2026', endDate: '22.09.2026', taskId: 'tone-of-voice', defaultMetrics: { time: 4, quality: 1, cost: 1 } },
+  { title: 'Визуальные шаблоны', startDay: 7, duration: 5, startDate: '21.09.2026', endDate: '25.09.2026', taskId: 'visual-template-kit', defaultMetrics: { time: 5, quality: 1, cost: 1 } },
+  { title: 'Концепция каналов', startDay: 8, duration: 3, startDate: '22.09.2026', endDate: '24.09.2026', taskId: 'channel-concept', defaultMetrics: { time: 3, quality: 1, cost: 1 } },
+  { title: 'Графические материалы', startDay: 10, duration: 7, startDate: '24.09.2026', endDate: '02.10.2026', taskId: 'graphic-materials', defaultMetrics: { time: 7, quality: 1, cost: 1 } },
+  { title: 'Страницы сообществ', startDay: 24, duration: 1, startDate: '08.10.2026', endDate: '08.10.2026', taskId: 'community-pages', defaultMetrics: { time: 1, quality: 1, cost: 1 } },
 ];
 
 const timelineStart = new Date(Date.UTC(2026, 8, 14));
@@ -59,11 +61,11 @@ function CoordinateSystem({ axisLength, qualityLength }: { axisLength: number; q
   );
 }
 
-function GanttCube({ task, index, onOpenTask }: { task: GanttTask; index: number; onOpenTask: (taskId: string) => void }) {
+function GanttCube({ task, metrics, qualityOffset, onOpenTask }: { task: GanttTask; metrics: { time: number; quality: number; cost: number }; qualityOffset: number; onOpenTask: (taskId: string) => void }) {
   const [isHovered, setIsHovered] = useState(false);
   const lineRef = useRef<THREE.LineSegments>(null);
-  const size: [number, number, number] = [task.duration, 1, 1];
-  const position: [number, number, number] = [task.startDay + task.duration / 2, 0.5, -(index * 2 + 0.5)];
+  const size: [number, number, number] = [metrics.time, metrics.cost, metrics.quality];
+  const position: [number, number, number] = [task.startDay + metrics.time / 2, metrics.cost / 2, -(qualityOffset + metrics.quality / 2)];
 
   useEffect(() => {
     lineRef.current?.computeLineDistances();
@@ -98,8 +100,8 @@ function GanttCube({ task, index, onOpenTask }: { task: GanttTask; index: number
           <div className="pointer-events-none w-56 rounded-lg border border-emerald-400/60 bg-slate-950/95 p-3 text-left text-xs text-slate-200 shadow-xl">
             <p className="font-semibold text-emerald-300">{task.title}</p>
             <p className="mt-1">Срок: {task.startDate} - {task.endDate}</p>
-            <p>Рабочих дней: {task.duration}</p>
-            <p>Бюджет: 1 · Качество: 1</p>
+            <p>Время: {metrics.time} · Деньги: {metrics.cost}</p>
+            <p>Качество: {metrics.quality}</p>
             <p className="mt-2 text-emerald-400">Нажмите кубик, чтобы открыть задачу</p>
           </div>
         </Html>
@@ -110,7 +112,30 @@ function GanttCube({ task, index, onOpenTask }: { task: GanttTask; index: number
 
 export function CubeScene({ onOpenTask }: { onOpenTask: (taskId: string) => void }) {
   const axisLength = 27;
-  const qualityLength = PREPARATION_TASKS.length * 2;
+  const [taskMetrics, setTaskMetrics] = useState<Record<string, { time: number; quality: number; cost: number }>>({});
+
+  useEffect(() => {
+    let mounted = true;
+    const loadMetrics = async () => {
+      const entries = await Promise.all(PREPARATION_TASKS.map(async (task) => {
+        const document = await loadRemoteDocument(task.taskId, task.title);
+        return [task.taskId, document.metrics ?? task.defaultMetrics] as const;
+      }));
+      if (mounted) setTaskMetrics(Object.fromEntries(entries));
+    };
+    void loadMetrics();
+    const unsubscribers = PREPARATION_TASKS.map((task) => subscribeToTask(task.taskId, () => { void loadMetrics(); }));
+    return () => { mounted = false; unsubscribers.forEach((unsubscribe) => unsubscribe()); };
+  }, []);
+
+  const resolvedMetrics = PREPARATION_TASKS.map((task) => taskMetrics[task.taskId] ?? task.defaultMetrics);
+  const qualityOffsets: number[] = [];
+  let qualityCursor = 0;
+  resolvedMetrics.forEach((metrics) => {
+    qualityOffsets.push(qualityCursor);
+    qualityCursor += Math.max(1, metrics.quality) + 1;
+  });
+  const qualityLength = qualityCursor;
 
   return (
     <div style={{ width: '100%', height: '100%', minHeight: '500px', background: '#0f172a', borderRadius: '12px', position: 'relative' }}>
@@ -123,7 +148,7 @@ export function CubeScene({ onOpenTask }: { onOpenTask: (taskId: string) => void
         <directionalLight position={[10, 15, 10]} intensity={1.5} />
         <pointLight position={[-10, 8, -8]} intensity={0.8} color="#60a5fa" />
         <CoordinateSystem axisLength={axisLength} qualityLength={qualityLength} />
-        {PREPARATION_TASKS.map((task, index) => <GanttCube key={task.title} task={task} index={index} onOpenTask={onOpenTask} />)}
+        {PREPARATION_TASKS.map((task, index) => <GanttCube key={task.title} task={task} metrics={resolvedMetrics[index]} qualityOffset={qualityOffsets[index]} onOpenTask={onOpenTask} />)}
         <OrbitControls enablePan enableZoom enableRotate minDistance={10} maxDistance={65} />
       </Canvas>
     </div>
