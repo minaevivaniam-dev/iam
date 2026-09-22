@@ -1,5 +1,44 @@
 -- Run after enabling Email auth in Supabase Authentication settings.
 
+create table if not exists public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email text not null default '',
+  role text not null default 'client' check (role in ('manager', 'copywriter', 'designer', 'client')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.profiles enable row level security;
+
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  requested_role text := new.raw_user_meta_data->>'role';
+begin
+  if requested_role not in ('manager', 'copywriter', 'designer', 'client') then
+    requested_role := 'client';
+  end if;
+
+  insert into public.profiles (id, email, role)
+  values (new.id, coalesce(new.email, ''), requested_role)
+  on conflict (id) do update set email = excluded.email;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+insert into public.profiles (id, email, role)
+select id, coalesce(email, ''), 'client'
+from auth.users
+on conflict (id) do nothing;
+
 alter table if exists public.documents
   add column if not exists owner_id uuid references auth.users(id);
 alter table if exists public.document_activity
@@ -32,7 +71,7 @@ begin
     select schemaname, tablename, policyname
     from pg_policies
     where schemaname = 'public'
-      and tablename in ('documents', 'document_activity', 'tasks', 'executors', 'media_plan_rows')
+      and tablename in ('profiles', 'documents', 'document_activity', 'tasks', 'executors', 'media_plan_rows')
   loop
     execute format('drop policy if exists %I on %I.%I', policy_row.policyname, policy_row.schemaname, policy_row.tablename);
   end loop;
@@ -45,6 +84,11 @@ begin
     create policy documents_insert_own on public.documents for insert to authenticated with check (owner_id = auth.uid());
     create policy documents_update_own on public.documents for update to authenticated using (owner_id = auth.uid()) with check (owner_id = auth.uid());
     create policy documents_delete_own on public.documents for delete to authenticated using (owner_id = auth.uid());
+  end if;
+
+  if to_regclass('public.profiles') is not null then
+    create policy profiles_select_own on public.profiles for select to authenticated using (id = auth.uid());
+    create policy profiles_update_own on public.profiles for update to authenticated using (id = auth.uid()) with check (id = auth.uid());
   end if;
 
   if to_regclass('public.document_activity') is not null then

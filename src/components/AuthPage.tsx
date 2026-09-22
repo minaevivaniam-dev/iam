@@ -2,10 +2,18 @@ import { useState } from 'react';
 import { ArrowRight, LockKeyhole, Mail } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
+const ROLES = [
+  { id: 'manager', label: 'Менеджер' },
+  { id: 'copywriter', label: 'Копирайтер' },
+  { id: 'designer', label: 'Дизайнер' },
+  { id: 'client', label: 'Клиент' },
+] as const;
+
 export function AuthPage() {
   const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState<(typeof ROLES)[number]['id']>('manager');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -18,12 +26,27 @@ export function AuthPage() {
 
     const result = mode === 'sign-in'
       ? await supabase.auth.signInWithPassword({ email, password })
-      : await supabase.auth.signUp({ email, password });
+      : await supabase.auth.signUp({ email, password, options: { data: { role } } });
 
     setBusy(false);
     if (result.error) {
       setError(result.error.message);
       return;
+    }
+
+    if (mode === 'sign-in' && result.data.user) {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', result.data.user.id)
+        .maybeSingle();
+
+      if (profileError || !profile || profile.role !== role) {
+        await supabase.auth.signOut();
+        setError('Для этого аккаунта выбрана другая роль. Проверьте роль и повторите вход.');
+        setBusy(false);
+        return;
+      }
     }
 
     if (mode === 'sign-up' && !result.data.session) {
@@ -49,6 +72,12 @@ export function AuthPage() {
               <Mail size={16} className="absolute left-3 top-3 text-slate-400" />
               <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" required className="w-full border border-slate-200 rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:border-blue-500" />
             </div>
+          </label>
+          <label className="block">
+            <span className="block text-xs font-medium text-slate-600 mb-1">Роль аккаунта</span>
+            <select value={role} onChange={(event) => setRole(event.target.value as typeof role)} className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-500">
+              {ROLES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+            </select>
           </label>
           <label className="block">
             <span className="block text-xs font-medium text-slate-600 mb-1">Пароль</span>
