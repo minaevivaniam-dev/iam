@@ -9,6 +9,8 @@ const ROLES = [
   { id: 'client', label: 'Клиент' },
 ] as const;
 
+const getRoleEmail = (role: (typeof ROLES)[number]['id']) => `${role}@fc-bas.local`;
+
 export function AuthPage() {
   const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in');
   const [email, setEmail] = useState('');
@@ -24,9 +26,11 @@ export function AuthPage() {
     setError('');
     setMessage('');
 
+    const authEmail = email.trim() || getRoleEmail(role);
+
     const result = mode === 'sign-in'
-      ? await supabase.auth.signInWithPassword({ email, password })
-      : await supabase.auth.signUp({ email, password, options: { data: { role } } });
+      ? await supabase.auth.signInWithPassword({ email: authEmail, password })
+      : await supabase.auth.signUp({ email: authEmail, password, options: { data: { role } } });
 
     setBusy(false);
     if (result.error) {
@@ -50,7 +54,7 @@ export function AuthPage() {
     }
 
     if (mode === 'sign-up' && !result.data.session) {
-      setMessage('Регистрация создана. Проверьте почту и подтвердите адрес.');
+      setMessage('Аккаунт создан. В настройках Supabase отключите Confirm email, чтобы вход был без подтверждения.');
     }
   };
 
@@ -67,10 +71,10 @@ export function AuthPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <label className="block">
-            <span className="block text-xs font-medium text-slate-600 mb-1">Email</span>
+            <span className="block text-xs font-medium text-slate-600 mb-1">Email (необязательно)</span>
             <div className="relative">
               <Mail size={16} className="absolute left-3 top-3 text-slate-400" />
-              <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" required className="w-full border border-slate-200 rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:border-blue-500" />
+              <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" placeholder="Можно оставить пустым" className="w-full border border-slate-200 rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:border-blue-500" />
             </div>
           </label>
           <label className="block">
