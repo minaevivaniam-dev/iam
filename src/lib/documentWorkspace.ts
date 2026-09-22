@@ -29,6 +29,7 @@ export type StoredDocument = {
   description?: string;
   assignee?: string;
   metrics?: { startDate: string; endDate: string; quality: number; cost: number };
+  approvalStatus?: 'draft' | 'pending' | 'approved' | 'rework';
 };
 
 const getStorageKey = (taskId: string) => `fc-bas-document:${taskId}`;
@@ -69,6 +70,7 @@ export function readDocument(taskId: string, fallbackTitle: string): StoredDocum
       description: parsed.description,
       assignee: parsed.assignee,
       metrics: parsed.metrics,
+      approvalStatus: parsed.approvalStatus,
     };
   } catch {
     return emptyDocument(taskId, fallbackTitle);
@@ -144,6 +146,7 @@ export async function persistDocument(taskId: string, record: StoredDocument): P
     description: record.description ?? null,
     assignee: record.assignee ?? null,
     metrics: record.metrics ?? null,
+    approval_status: record.approvalStatus ?? 'draft',
     created_at: record.createdAt,
     updated_at: record.updatedAt,
   };
@@ -236,6 +239,7 @@ export async function loadRemoteDocument(taskId: string, fallbackTitle: string):
       description: data.description ?? undefined,
       assignee: data.assignee ?? undefined,
       metrics: data.metrics ?? undefined,
+      approvalStatus: data.approval_status ?? 'draft',
     };
 
     if (typeof window !== 'undefined' && window.localStorage.getItem(getStorageKey(taskId))) {

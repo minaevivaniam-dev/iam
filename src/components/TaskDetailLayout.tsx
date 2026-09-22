@@ -62,6 +62,7 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
   const [notesText, setNotesText] = useState(config.notesDefault ?? config.description);
   const [selectedAssignee, setSelectedAssignee] = useState(config.assignee);
   const [editableMetrics, setEditableMetrics] = useState<TaskMetrics>(() => normalizeMetrics(config));
+  const [approvalStatus, setApprovalStatus] = useState<'draft' | 'pending' | 'approved' | 'rework'>('draft');
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [uploads, setUploads] = useState<UploadedDocument[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -92,6 +93,7 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
       setDescriptionText(doc.description ?? config.description);
       setSelectedAssignee(doc.assignee ?? config.assignee);
       setEditableMetrics(doc.metrics ?? normalizeMetrics(config));
+      setApprovalStatus(doc.approvalStatus ?? 'draft');
       notesDirtyRef.current = false;
       descriptionDirtyRef.current = false;
       metricsHydratedRef.current = true;
@@ -116,6 +118,7 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
       if (metricsHydratedRef.current && !metricsDirtyRef.current && doc.metrics) {
         setEditableMetrics(doc.metrics);
       }
+      setApprovalStatus(doc.approvalStatus ?? 'draft');
     });
 
     return () => {
@@ -216,6 +219,33 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
     } catch {
       setSaveState('error');
     }
+  };
+
+  const saveApprovalStatus = async (nextStatus: 'pending' | 'approved' | 'rework') => {
+    const current = readDocument(taskPrefix, config.title);
+    const next = {
+      ...current,
+      title: config.title,
+      taskId: taskPrefix,
+      content: notesText,
+      description: descriptionText,
+      assignee: selectedAssignee,
+      metrics: editableMetrics,
+      approvalStatus: nextStatus,
+      updatedAt: new Date().toISOString(),
+      uploads,
+    };
+    setApprovalStatus(nextStatus);
+    writeDocument(taskPrefix, next);
+    const saved = await persistDocument(taskPrefix, next);
+    await persistActivity(taskPrefix, nextStatus === 'pending' ? 'submit-review' : nextStatus, nextStatus === 'approved' ? 'Задача согласована: деньги 10/10, качество 10/10' : nextStatus === 'rework' ? 'Задача отправлена на доработку' : 'Задача отправлена на согласование');
+    return saved;
+  };
+
+  const handleApprove = async () => {
+    const confirmed = window.confirm('Подтвердить выполнение задачи на 10 из 10 по деньгам и качеству?');
+    if (!confirmed) return;
+    await saveApprovalStatus('approved');
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -344,6 +374,18 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
             )}
           </div>
         </div>
+        <div className="flex items-center gap-2 shrink-0">
+        {!reviewMode && approvalStatus !== 'approved' && (
+          <button onClick={() => { void saveApprovalStatus('pending'); setReviewMode(true); }} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100">
+            Отправить на согласование
+          </button>
+        )}
+        {reviewMode && approvalStatus === 'pending' && (
+          <>
+            <button onClick={() => { void handleApprove(); }} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700">Согласовать</button>
+            <button onClick={() => { void saveApprovalStatus('rework'); setReviewMode(false); }} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-rose-600 text-white hover:bg-rose-700">Отправить на доработку</button>
+          </>
+        )}
         <button
           onClick={handleManualSave}
           disabled={saveState === 'saving'}
@@ -353,6 +395,7 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
         >
           <Save size={16} />{saveState === 'saving' ? 'Сохранение...' : saveState === 'saved' ? 'Сохранено в базе' : saveState === 'error' ? 'Локально сохранено' : 'Сохранить'}
         </button>
+        </div>
       </div>
 
       {/* === ОПИСАНИЕ === */}

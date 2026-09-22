@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { Html, OrbitControls, Text } from '@react-three/drei';
+import { OrbitControls, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { loadRemoteDocument, subscribeToTask } from '../lib/documentWorkspace';
 
@@ -62,8 +62,7 @@ function CoordinateSystem({ axisLength, qualityLength }: { axisLength: number; q
   );
 }
 
-function GanttCube({ task, metrics, qualityOffset, onOpenTask }: { task: GanttTask; metrics: { startDate: string; endDate: string; quality: number; cost: number }; qualityOffset: number; onOpenTask: (taskId: string) => void }) {
-  const [isHovered, setIsHovered] = useState(false);
+function GanttCube({ task, metrics, qualityOffset, approvalStatus, onHover, onOpenTask }: { task: GanttTask; metrics: { startDate: string; endDate: string; quality: number; cost: number }; qualityOffset: number; approvalStatus: 'draft' | 'pending' | 'approved' | 'rework'; onHover: (hovered: boolean) => void; onOpenTask: (taskId: string) => void }) {
   const lineRef = useRef<THREE.LineSegments>(null);
   const start = new Date(`${metrics.startDate}T00:00:00Z`);
   const end = new Date(`${metrics.endDate}T00:00:00Z`);
@@ -92,7 +91,7 @@ function GanttCube({ task, metrics, qualityOffset, onOpenTask }: { task: GanttTa
     <group position={position}>
       <mesh>
         <boxGeometry args={size} />
-        <meshBasicMaterial color="#22c55e" transparent opacity={0.035} depthWrite={false} />
+        <meshBasicMaterial color="#22c55e" transparent opacity={approvalStatus === 'approved' ? 0.38 : 0.035} depthWrite={false} />
       </mesh>
       {passedDuration > 0 && <mesh position={[-width / 2 + passedDuration / 2, 0, 0]}>
         <boxGeometry args={[passedDuration, height, depth]} />
@@ -102,27 +101,14 @@ function GanttCube({ task, metrics, qualityOffset, onOpenTask }: { task: GanttTa
         <bufferGeometry>
           <float32BufferAttribute attach="attributes-position" args={[new Float32Array(edgePoints), 3]} itemSize={3} />
         </bufferGeometry>
-        <lineDashedMaterial color="#4ade80" transparent opacity={0.85} dashSize={0.18} gapSize={0.12} linewidth={1} />
+        {approvalStatus === 'approved' ? <lineBasicMaterial color="#22c55e" transparent opacity={1} /> : <lineDashedMaterial color="#4ade80" transparent opacity={0.85} dashSize={0.18} gapSize={0.12} linewidth={1} />}
       </lineSegments>
-      <mesh onPointerEnter={(event) => { event.stopPropagation(); setIsHovered(true); }} onPointerLeave={(event) => { event.stopPropagation(); setIsHovered(false); }} onClick={(event) => { event.stopPropagation(); onOpenTask(task.taskId); }}>
+      <mesh onPointerOver={(event) => { event.stopPropagation(); onHover(true); }} onPointerOut={(event) => { event.stopPropagation(); onHover(false); }} onClick={(event) => { event.stopPropagation(); onOpenTask(task.taskId); }}>
         <boxGeometry args={size} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
       <Text position={[0, 0.72, -0.52]} fontSize={0.3} color="#86efac" anchorX="center" anchorY="middle" maxWidth={Math.max(1.2, task.duration - 0.2)}>{task.title}</Text>
       <Text position={[0, -0.72, 0]} fontSize={0.25} color="#86efac" anchorX="center">{metrics.startDate} - {metrics.endDate}</Text>
-      {isHovered && (
-        <Html distanceFactor={8} position={[0, 1.3, 0]} center>
-          <div className="pointer-events-none w-80 rounded-xl border border-emerald-400/70 bg-slate-950/95 p-4 text-left text-sm text-slate-200 shadow-2xl">
-            <p className="font-semibold text-emerald-300">{task.title}</p>
-            <p className="mt-1">Срок: {task.startDate} - {task.endDate}</p>
-            <p className="mt-2 leading-5 text-slate-300">{task.description}</p>
-            <p>Время: {metrics.startDate} - {metrics.endDate}</p>
-            <p>Деньги: {metrics.cost} · Качество: {metrics.quality}</p>
-            <p>Качество: {metrics.quality}</p>
-            <p className="mt-2 text-emerald-400">Нажмите кубик, чтобы открыть задачу</p>
-          </div>
-        </Html>
-      )}
     </group>
   );
 }
@@ -130,15 +116,20 @@ function GanttCube({ task, metrics, qualityOffset, onOpenTask }: { task: GanttTa
 export function CubeScene({ onOpenTask }: { onOpenTask: (taskId: string) => void }) {
   const axisLength = 27;
   const [taskMetrics, setTaskMetrics] = useState<Record<string, { startDate: string; endDate: string; quality: number; cost: number }>>({});
+  const [taskStatuses, setTaskStatuses] = useState<Record<string, 'draft' | 'pending' | 'approved' | 'rework'>>({});
+  const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
     const loadMetrics = async () => {
       const entries = await Promise.all(PREPARATION_TASKS.map(async (task) => {
         const document = await loadRemoteDocument(task.taskId, task.title);
-        return [task.taskId, document.metrics ?? task.defaultMetrics] as const;
+        return [task.taskId, { metrics: document.metrics ?? task.defaultMetrics, status: document.approvalStatus ?? 'draft' }] as const;
       }));
-      if (mounted) setTaskMetrics(Object.fromEntries(entries));
+      if (mounted) {
+        setTaskMetrics(Object.fromEntries(entries.map(([id, value]) => [id, value.metrics])));
+        setTaskStatuses(Object.fromEntries(entries.map(([id, value]) => [id, value.status])));
+      }
     };
     void loadMetrics();
     const unsubscribers = PREPARATION_TASKS.map((task) => subscribeToTask(task.taskId, () => { void loadMetrics(); }));
@@ -165,9 +156,21 @@ export function CubeScene({ onOpenTask }: { onOpenTask: (taskId: string) => void
         <directionalLight position={[10, 15, 10]} intensity={1.5} />
         <pointLight position={[-10, 8, -8]} intensity={0.8} color="#60a5fa" />
         <CoordinateSystem axisLength={axisLength} qualityLength={qualityLength} />
-        {PREPARATION_TASKS.map((task, index) => <GanttCube key={task.title} task={task} metrics={resolvedMetrics[index]} qualityOffset={qualityOffsets[index]} onOpenTask={onOpenTask} />)}
+        {PREPARATION_TASKS.map((task, index) => <GanttCube key={task.title} task={task} metrics={resolvedMetrics[index]} qualityOffset={qualityOffsets[index]} approvalStatus={taskStatuses[task.taskId] ?? 'draft'} onHover={(hovered) => setHoveredTaskId(hovered ? task.taskId : null)} onOpenTask={onOpenTask} />)}
         <OrbitControls enablePan enableZoom enableRotate minDistance={10} maxDistance={65} />
       </Canvas>
+      {hoveredTaskId && (() => {
+        const index = PREPARATION_TASKS.findIndex((task) => task.taskId === hoveredTaskId);
+        const task = PREPARATION_TASKS[index];
+        const metrics = resolvedMetrics[index];
+        return <div className="absolute left-6 bottom-6 z-20 w-96 rounded-xl border border-emerald-400/70 bg-slate-950/95 p-5 text-left text-sm text-slate-200 shadow-2xl pointer-events-none">
+          <p className="text-base font-semibold text-emerald-300">{task.title}</p>
+          <p className="mt-1 text-slate-400">{metrics.startDate} - {metrics.endDate}</p>
+          <p className="mt-3 leading-6 text-slate-300">{task.description}</p>
+          <p className="mt-2">Деньги: {metrics.cost}/10 · Качество: {metrics.quality}/10</p>
+          <p className="mt-1 text-emerald-400">Нажмите кубик, чтобы открыть задачу</p>
+        </div>;
+      })()}
     </div>
   );
 }
