@@ -55,7 +55,7 @@ function CoordinateSystem({ axisLength, qualityLength }: { axisLength: number; q
       <Text position={[0, 0, qualityLength + 0.7]} fontSize={0.55} color="#cbd5e1" rotation={[0, Math.PI / 2, 0]}>Качество (Z)</Text>
       <gridHelper args={[axisLength, axisLength, '#334155', '#1e293b']} position={[axisLength / 2, 0, qualityLength / 2]} />
       {Array.from({ length: axisLength + 1 }, (_, day) => (
-        day % 2 === 0 ? <Text key={day} position={[day, -0.45, 0]} fontSize={0.27} color="#94a3b8">{formatDate(day)}</Text> : null
+        day % 2 === 0 ? <Text key={day} position={[day, -0.45, qualityLength + 0.35]} fontSize={0.27} color="#94a3b8">{formatDate(day)}</Text> : null
       ))}
       {[0, 1, 2].map((value) => <Text key={value} position={[-0.4, value + 0.5, 0]} fontSize={0.3} color="#94a3b8">{value}</Text>)}
     </group>

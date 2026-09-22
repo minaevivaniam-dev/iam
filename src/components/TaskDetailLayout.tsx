@@ -63,6 +63,10 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
   const [selectedAssignee, setSelectedAssignee] = useState(config.assignee);
   const [editableMetrics, setEditableMetrics] = useState<TaskMetrics>(() => normalizeMetrics(config));
   const [approvalStatus, setApprovalStatus] = useState<'draft' | 'pending' | 'approved' | 'rework'>('draft');
+  const [approvalModalOpen, setApprovalModalOpen] = useState(false);
+  const [approvalQuality, setApprovalQuality] = useState(10);
+  const [approvalCost, setApprovalCost] = useState(10);
+  const [approvalComment, setApprovalComment] = useState('');
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [uploads, setUploads] = useState<UploadedDocument[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -243,9 +247,13 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
   };
 
   const handleApprove = async () => {
-    const confirmed = window.confirm('Подтвердить выполнение задачи на 10 из 10 по деньгам и качеству?');
-    if (!confirmed) return;
+    if (approvalQuality !== 10 || approvalCost !== 10) return;
     await saveApprovalStatus('approved');
+    if (approvalComment.trim()) {
+      await persistActivity(taskPrefix, 'approval-comment', approvalComment.trim());
+    }
+    setApprovalModalOpen(false);
+    setApprovalComment('');
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -382,7 +390,7 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
         )}
         {reviewMode && approvalStatus === 'pending' && (
           <>
-            <button onClick={() => { void handleApprove(); }} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700">Согласовать</button>
+            <button onClick={() => setApprovalModalOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700">Согласовать</button>
             <button onClick={() => { void saveApprovalStatus('rework'); setReviewMode(false); }} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-rose-600 text-white hover:bg-rose-700">Отправить на доработку</button>
           </>
         )}
@@ -568,6 +576,43 @@ export function TaskDetailLayout({ config, taskPrefix, onBack }: { config: TaskC
           />
         )}
       </div>
+
+      {approvalModalOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Закрытие задачи</h2>
+                <p className="mt-1 text-sm text-slate-500">Подтвердите результат и оставьте комментарий для истории задачи.</p>
+              </div>
+              <button type="button" onClick={() => setApprovalModalOpen(false)} className="text-slate-400 hover:text-slate-700">×</button>
+            </div>
+
+            <div className="mt-6 space-y-5">
+              {[
+                { label: 'Качество', value: approvalQuality, setValue: setApprovalQuality, color: 'accent-emerald-600' },
+                { label: 'Деньги', value: approvalCost, setValue: setApprovalCost, color: 'accent-amber-500' },
+              ].map((metric) => (
+                <label key={metric.label} className="block">
+                  <div className="mb-2 flex items-center justify-between text-sm font-medium text-slate-700">
+                    <span>{metric.label}</span><span>{metric.value}/10</span>
+                  </div>
+                  <input type="range" min="1" max="10" step="1" value={metric.value} onChange={(event) => metric.setValue(Number(event.target.value))} className={`w-full ${metric.color}`} />
+                </label>
+              ))}
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700">Комментарий</span>
+                <textarea value={approvalComment} onChange={(event) => setApprovalComment(event.target.value)} rows={4} placeholder="Что важно зафиксировать по итогам задачи?" className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-emerald-500 focus:bg-white" />
+              </label>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={() => setApprovalModalOpen(false)} className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100">Отмена</button>
+              <button type="button" disabled={approvalQuality !== 10 || approvalCost !== 10} onClick={() => { void handleApprove(); }} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300">Закрыть задачу</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
