@@ -395,10 +395,13 @@ export function ReviewableTable({
   onSaveReady?: (save: () => Promise<boolean>) => void;
 }) {
   const [rows, setRows] = useState<TaskRow[]>(initialRows);
-  const [hiddenCols, setHiddenCols] = useState<Set<string>>(new Set());
-  const [colWidths, setColWidths] = useState<Record<string, number>>(
-    Object.fromEntries(columns.map(c => [c.key, c.width]))
-  );
+  const [hiddenCols, setHiddenCols] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(`fc-bas-hidden-cols:${taskPrefix}`) || '[]')); } catch { return new Set(); }
+  });
+  const [colWidths, setColWidths] = useState<Record<string, number>>(() => {
+    const defaults = Object.fromEntries(columns.map(c => [c.key, c.width]));
+    try { return { ...defaults, ...JSON.parse(localStorage.getItem(`fc-bas-col-widths:${taskPrefix}`) || '{}') }; } catch { return defaults; }
+  });
   const [activeId, setActiveId] = useState<string | null>(null);
   const [editingCell, setEditingCell] = useState<{ rowId: string; colKey: string } | null>(null);
   const [tempText, setTempText] = useState('');
@@ -413,6 +416,11 @@ export function ReviewableTable({
   const saveTimer = useRef<number | null>(null);
 
   rowsRef.current = rows;
+
+  useEffect(() => {
+    localStorage.setItem(`fc-bas-hidden-cols:${taskPrefix}`, JSON.stringify(Array.from(hiddenCols)));
+    localStorage.setItem(`fc-bas-col-widths:${taskPrefix}`, JSON.stringify(colWidths));
+  }, [colWidths, hiddenCols, taskPrefix]);
 
   const saveRows = useCallback(async () => {
     const current = readDocument(taskPrefix, taskPrefix);

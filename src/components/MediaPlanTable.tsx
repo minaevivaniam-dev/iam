@@ -101,11 +101,18 @@ function SingleMediaTable({ tabPrefix }: { tabPrefix: string }) {
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [tempText, setTempText] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [colWidths, setColWidths] = useState({ date: 160, status: 150, rubric: 150, attach: 140, platform: 220, text: 300 });
+  const [colWidths, setColWidths] = useState<Record<string, number>>(() => {
+    const defaults = { date: 160, status: 150, rubric: 150, attach: 140, platform: 220, text: 300 };
+    try { return { ...defaults, ...JSON.parse(localStorage.getItem(`fc-bas-media-col-widths:${tabPrefix}`) || '{}') }; } catch { return defaults; }
+  });
   const resizingCol = useRef<keyof typeof colWidths | null>(null);
   const startX = useRef<number>(0);
   const startWidth = useRef<number>(0);
   const editorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    localStorage.setItem(`fc-bas-media-col-widths:${tabPrefix}`, JSON.stringify(colWidths));
+  }, [colWidths, tabPrefix]);
 
   useEffect(() => {
     if (!initialized.current) {

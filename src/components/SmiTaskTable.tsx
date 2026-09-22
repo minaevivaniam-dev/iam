@@ -137,9 +137,10 @@ export function SmiTaskTable({ taskPrefix, rowCount = 20, hiddenCols, onToggleHi
   onResetColumnWidth: (key: string) => void;
 }) {
   const [rows, setRows] = useState<SmiRow[]>(() => generateRows(taskPrefix, rowCount));
-  const [colWidths, setColWidths] = useState<Record<string, number>>(
-    Object.fromEntries(SMI_COLUMNS.map(c => [c.key, c.width]))
-  );
+  const [colWidths, setColWidths] = useState<Record<string, number>>(() => {
+    const defaults = Object.fromEntries(SMI_COLUMNS.map(c => [c.key, c.width]));
+    try { return { ...defaults, ...JSON.parse(localStorage.getItem(`fc-bas-smi-col-widths:${taskPrefix}`) || '{}') }; } catch { return defaults; }
+  });
   const [activeId, setActiveId] = useState<string | null>(null);
 
   const resizingCol = useRef<string | null>(null);
@@ -148,6 +149,10 @@ export function SmiTaskTable({ taskPrefix, rowCount = 20, hiddenCols, onToggleHi
   const rowsRef = useRef(rows);
   const hydratedRef = useRef(false);
   const saveTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem(`fc-bas-smi-col-widths:${taskPrefix}`, JSON.stringify(colWidths));
+  }, [colWidths, taskPrefix]);
 
   rowsRef.current = rows;
 

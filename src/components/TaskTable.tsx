@@ -216,8 +216,12 @@ export function TaskTable({
   columns?: ColumnConfig[];
 }) {
   const [rows, setRows] = useState<TaskRow[]>(() => generateRows(taskPrefix));
-  const [hiddenCols, setHiddenCols] = useState<Set<string>>(new Set());
-  const [colWidths, setColWidths] = useState(INITIAL_COL_WIDTHS);
+  const [hiddenCols, setHiddenCols] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(`fc-bas-hidden-cols:${taskPrefix}`) || '[]')); } catch { return new Set(); }
+  });
+  const [colWidths, setColWidths] = useState<typeof INITIAL_COL_WIDTHS>(() => {
+    try { return { ...INITIAL_COL_WIDTHS, ...JSON.parse(localStorage.getItem(`fc-bas-col-widths:${taskPrefix}`) || '{}') }; } catch { return INITIAL_COL_WIDTHS; }
+  });
   const [activeId, setActiveId] = useState<string | null>(null);
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [tempText, setTempText] = useState('');
@@ -231,6 +235,11 @@ export function TaskTable({
   const saveTimer = useRef<number | null>(null);
 
   rowsRef.current = rows;
+
+  useEffect(() => {
+    localStorage.setItem(`fc-bas-hidden-cols:${taskPrefix}`, JSON.stringify(Array.from(hiddenCols)));
+    localStorage.setItem(`fc-bas-col-widths:${taskPrefix}`, JSON.stringify(colWidths));
+  }, [colWidths, hiddenCols, taskPrefix]);
 
   const saveRows = useCallback(async () => {
     const current = readDocument(taskPrefix, taskPrefix);
