@@ -7,6 +7,8 @@ import { loadRemoteDocument, subscribeToTask } from '../lib/documentWorkspace';
 type GanttTask = {
   title: string;
   description: string;
+  block: string;
+  blockColor: string;
   startDay: number;
   duration: number;
   startDate: string;
@@ -16,13 +18,13 @@ type GanttTask = {
 };
 
 const PREPARATION_TASKS: GanttTask[] = [
-  { title: 'Аудит каналов', description: 'Оценка текущей структуры контента, форматов, периодичности и показателей вовлечённости.', startDay: 1, duration: 6, startDate: '15.09.2026', endDate: '22.09.2026', taskId: 'audit-channels', defaultMetrics: { startDate: '2026-09-15', endDate: '2026-09-22', quality: 10, cost: 10 } },
-  { title: 'Рубрикатор', description: 'Перечень постоянных тематических рубрик с назначением, каналом, аудиторией и форматом.', startDay: 0, duration: 7, startDate: '14.09.2026', endDate: '22.09.2026', taskId: 'rubricator-update', defaultMetrics: { startDate: '2026-09-14', endDate: '2026-09-22', quality: 10, cost: 10 } },
-  { title: 'Tone of voice', description: 'Принципы обращения к аудитории, недопустимая лексика и правила подачи экспертной информации.', startDay: 3, duration: 4, startDate: '17.09.2026', endDate: '22.09.2026', taskId: 'tone-of-voice', defaultMetrics: { startDate: '2026-09-17', endDate: '2026-09-22', quality: 10, cost: 10 } },
-  { title: 'Визуальные шаблоны', description: 'Не менее пяти шаблонов: обложка, карточка, инфографика, титульный кадр и цитата эксперта.', startDay: 7, duration: 5, startDate: '21.09.2026', endDate: '25.09.2026', taskId: 'visual-template-kit', defaultMetrics: { startDate: '2026-09-21', endDate: '2026-09-25', quality: 10, cost: 10 } },
-  { title: 'Концепция каналов', description: 'Утверждение названий, рубрикатора и общей концепции новых каналов.', startDay: 8, duration: 3, startDate: '22.09.2026', endDate: '24.09.2026', taskId: 'channel-concept', defaultMetrics: { startDate: '2026-09-22', endDate: '2026-09-24', quality: 10, cost: 10 } },
-  { title: 'Графические материалы', description: 'Подготовка аватара, обложки и системы брендинга публикаций.', startDay: 10, duration: 7, startDate: '24.09.2026', endDate: '02.10.2026', taskId: 'graphic-materials', defaultMetrics: { startDate: '2026-09-24', endDate: '2026-10-02', quality: 10, cost: 10 } },
-  { title: 'Страницы сообществ', description: 'Создание и первичная настройка страниц сообществ для выбранных каналов.', startDay: 24, duration: 1, startDate: '08.10.2026', endDate: '08.10.2026', taskId: 'community-pages', defaultMetrics: { startDate: '2026-10-08', endDate: '2026-10-08', quality: 10, cost: 10 } },
+  { block: 'Подготовительный этап', blockColor: '#38bdf8', title: 'Аудит каналов', description: 'Оценка текущей структуры контента, форматов, периодичности и показателей вовлечённости.', startDay: 1, duration: 6, startDate: '15.09.2026', endDate: '22.09.2026', taskId: 'audit-channels', defaultMetrics: { startDate: '2026-09-15', endDate: '2026-09-22', quality: 10, cost: 10 } },
+  { block: 'Подготовительный этап', blockColor: '#38bdf8', title: 'Рубрикатор', description: 'Перечень постоянных тематических рубрик с назначением, каналом, аудиторией и форматом.', startDay: 0, duration: 7, startDate: '14.09.2026', endDate: '22.09.2026', taskId: 'rubricator-update', defaultMetrics: { startDate: '2026-09-14', endDate: '2026-09-22', quality: 10, cost: 10 } },
+  { block: 'Подготовительный этап', blockColor: '#38bdf8', title: 'Tone of voice', description: 'Принципы обращения к аудитории, недопустимая лексика и правила подачи экспертной информации.', startDay: 3, duration: 4, startDate: '17.09.2026', endDate: '22.09.2026', taskId: 'tone-of-voice', defaultMetrics: { startDate: '2026-09-17', endDate: '2026-09-22', quality: 10, cost: 10 } },
+  { block: 'Подготовительный этап', blockColor: '#38bdf8', title: 'Визуальные шаблоны', description: 'Не менее пяти шаблонов: обложка, карточка, инфографика, титульный кадр и цитата эксперта.', startDay: 7, duration: 5, startDate: '21.09.2026', endDate: '25.09.2026', taskId: 'visual-template-kit', defaultMetrics: { startDate: '2026-09-21', endDate: '2026-09-25', quality: 10, cost: 10 } },
+  { block: 'Подготовительный этап', blockColor: '#38bdf8', title: 'Концепция каналов', description: 'Утверждение названий, рубрикатора и общей концепции новых каналов.', startDay: 8, duration: 3, startDate: '22.09.2026', endDate: '24.09.2026', taskId: 'channel-concept', defaultMetrics: { startDate: '2026-09-22', endDate: '2026-09-24', quality: 10, cost: 10 } },
+  { block: 'Подготовительный этап', blockColor: '#38bdf8', title: 'Графические материалы', description: 'Подготовка аватара, обложки и системы брендинга публикаций.', startDay: 10, duration: 7, startDate: '24.09.2026', endDate: '02.10.2026', taskId: 'graphic-materials', defaultMetrics: { startDate: '2026-09-24', endDate: '2026-10-02', quality: 10, cost: 10 } },
+  { block: 'Подготовительный этап', blockColor: '#38bdf8', title: 'Страницы сообществ', description: 'Создание и первичная настройка страниц сообществ для выбранных каналов.', startDay: 24, duration: 1, startDate: '08.10.2026', endDate: '08.10.2026', taskId: 'community-pages', defaultMetrics: { startDate: '2026-10-08', endDate: '2026-10-08', quality: 10, cost: 10 } },
 ];
 
 const timelineStart = new Date(Date.UTC(2026, 8, 14));
@@ -113,6 +115,21 @@ function GanttCube({ task, metrics, qualityOffset, approvalStatus, onHover, onOp
   );
 }
 
+function BlockBand({ name, color, firstRow, lastRow, start, length, axisLength }: { name: string; color: string; firstRow: number; lastRow: number; start: number; length: number; axisLength: number }) {
+  const center = start + length / 2;
+  return (
+    <group>
+      <mesh position={[axisLength / 2, 0.015, center]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[axisLength, length]} />
+        <meshBasicMaterial color={color} transparent opacity={0.045} depthWrite={false} side={THREE.DoubleSide} />
+      </mesh>
+      <Text position={[-1.45, 0.28, center]} fontSize={0.38} color={color} anchorX="right" maxWidth={3}>{name}</Text>
+      <Text position={[-0.45, 0.28, center]} fontSize={1.2} color={color} anchorX="center" rotation={[0, 0, Math.PI / 2]}>{'}'}</Text>
+      <Text position={[-1.45, -0.25, center]} fontSize={0.25} color="#cbd5e1" anchorX="right">строки {firstRow}-{lastRow}</Text>
+    </group>
+  );
+}
+
 export function CubeScene({ onOpenTask }: { onOpenTask: (taskId: string) => void }) {
   const axisLength = 27;
   const [taskMetrics, setTaskMetrics] = useState<Record<string, { startDate: string; endDate: string; quality: number; cost: number }>>({});
@@ -148,6 +165,20 @@ export function CubeScene({ onOpenTask }: { onOpenTask: (taskId: string) => void
     qualityOffsets.push(qualityCursor);
   });
 
+  const blockGroups = Array.from(new Set(PREPARATION_TASKS.map((task) => task.block))).map((name) => {
+    const indexes = PREPARATION_TASKS.map((task, index) => task.block === name ? index : -1).filter((index) => index >= 0);
+    const first = indexes[0];
+    const last = indexes[indexes.length - 1];
+    return {
+      name,
+      color: PREPARATION_TASKS[first].blockColor,
+      firstRow: first + 1,
+      lastRow: last + 1,
+      start: qualityOffsets[last],
+      length: qualitySizes[first] + qualityOffsets[first] - qualityOffsets[last] + (qualitySizes[last] / 10),
+    };
+  });
+
   return (
     <div style={{ width: '100%', height: '100%', minHeight: '500px', background: '#0f172a', borderRadius: '12px', position: 'relative' }}>
       <div className="absolute left-4 top-4 z-10 max-w-sm rounded-lg bg-slate-900/80 border border-slate-700 px-3 py-2 text-xs text-slate-300">
@@ -159,6 +190,7 @@ export function CubeScene({ onOpenTask }: { onOpenTask: (taskId: string) => void
         <directionalLight position={[10, 15, 10]} intensity={1.5} />
         <pointLight position={[-10, 8, -8]} intensity={0.8} color="#60a5fa" />
         <CoordinateSystem axisLength={axisLength} qualityLength={qualityLength} />
+        {blockGroups.map((block) => <BlockBand key={block.name} {...block} axisLength={axisLength} />)}
         {PREPARATION_TASKS.map((task, index) => <GanttCube key={task.title} task={task} metrics={resolvedMetrics[index]} qualityOffset={qualityOffsets[index]} approvalStatus={taskStatuses[task.taskId] ?? 'draft'} onHover={(hovered) => setHoveredTaskId(hovered ? task.taskId : null)} onOpenTask={onOpenTask} />)}
         <OrbitControls enablePan enableZoom enableRotate minDistance={10} maxDistance={65} />
       </Canvas>
